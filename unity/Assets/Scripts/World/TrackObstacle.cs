@@ -1,22 +1,20 @@
-using System.Collections;
-using System.Collections.Generic;
-using MarioKart.AI;
-using MarioKart.AssetsSystem;
 using MarioKart.Players;
 using UnityEngine;
 
 namespace MarioKart.World
 {
+    public enum ObstacleKind
+    {
+        Boost,
+        Paralyze,
+        Spin,
+    }
+
     /// <summary>
     /// Pass-through pickup on the racing line. Trigger only — no physics
     /// collision — so karts drive through it. Each kind applies a short
     /// KartController effect; collecting destroys this instance and asks
     /// ObstacleGenerator to spawn a replacement elsewhere on the track.
-    ///
-    /// The visual is a child (primitive placeholder, optionally swapped for
-    /// a generated mesh). The power lives on this component, so a banana
-    /// mesh used as the skin still boosts / paralyzes / spins according to
-    /// <see cref="kind"/>.
     /// </summary>
     public class TrackObstacle : MonoBehaviour
     {
@@ -97,9 +95,9 @@ namespace MarioKart.World
         {
             switch (kind)
             {
-                case ObstacleKind.Boost: return new Color(1f, 0.85f, 0.15f);
-                case ObstacleKind.Paralyze: return new Color(0.95f, 0.15f, 0.2f);
-                case ObstacleKind.Spin: return new Color(0.7f, 0.25f, 1f);
+                case ObstacleKind.Boost: return new Color(0.98f, 0.82f, 0.42f);
+                case ObstacleKind.Paralyze: return new Color(0.78f, 0.42f, 0.38f);
+                case ObstacleKind.Spin: return new Color(0.62f, 0.68f, 0.82f);
                 default: return Color.white;
             }
         }

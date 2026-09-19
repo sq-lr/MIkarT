@@ -66,7 +66,7 @@ names, so the builder logs an error naming the field if a script renames one.
 | ↳ `EnvironmentGenerator` | `World/EnvironmentGenerator` **and** `Assets/GeneratedMeshLoader` on the same GameObject (not a child — `Generate()` destroys children) | `meshLoader` → self; `GeneratedMeshLoader.client` → `MeshAssetClient` |
 | ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon and two `TrackBarrier` walls (mesh colliders) | — |
 | ↳ `Checkpoints` | empty; `WorldGenerator` fills it at runtime with trigger gates facing the track tangent | — |
-| ↳ `Obstacles` | `World/ObstacleGenerator`; filled at runtime with pass-through pickups. Collecting one respawns another elsewhere. Photo assets (e.g. banana) replace the default ball and keep that pickup's power; generated meshes swap in via `GeneratedMeshLoader` | `meshLoader` → `GeneratedMeshLoader`; created at runtime if missing |
+| ↳ `Obstacles` | `World/ObstacleGenerator`; filled at runtime with pass-through boost / paralyze / spin pickups (colored spheres). Collecting one respawns another elsewhere | created at runtime if missing |
 | ↳ `Ground` | Plane ×60 (600 m) at y = −0.05 | palette-tinted via `groundRenderer` |
 | `Directional Light` | `Light` | palette-tinted via `sunLight` |
 | `RaceManager` | `Racing/RaceManager` | `players` → both `LapManager`s |

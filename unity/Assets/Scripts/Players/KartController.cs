@@ -81,6 +81,11 @@ namespace MarioKart.Players
             {
                 col.material = frictionless;
             }
+
+            if (GetComponent<KartVisual>() == null)
+            {
+                gameObject.AddComponent<KartVisual>();
+            }
         }
 
         private void OnDestroy()

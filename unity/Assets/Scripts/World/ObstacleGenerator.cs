@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
-using MarioKart.AI;
-using MarioKart.AssetsSystem;
+using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.World
@@ -9,42 +8,29 @@ namespace MarioKart.World
     /// <summary>
     /// Drops pass-through pickups on the racing line. Placement is random
     /// every Generate() call (a time salt is mixed into the derived seed) so
-    /// a new game — or Play Again — reshuffles them. Collecting one destroys
-    /// it and spawns a replacement elsewhere. Track/environment generation
-    /// stays deterministic from the recipe seed.
-    ///
-    /// Visuals prefer WorldRecipe assets: a label mapped in ObstacleCatalog
-    /// (e.g. banana → spin) skins that power; any other photo object can
-    /// still replace the default ball. GeneratedMeshLoader swaps the GLB
-    /// onto the pickup without changing its power.
+    /// a new game — or Play Again — reshuffles them. Positions are sampled
+    /// on the same smoothed loop as the road mesh, inset from the barrier
+    /// walls, so pickups stay in the lane. Collecting one destroys it and
+    /// spawns a replacement elsewhere.
     /// </summary>
     public class ObstacleGenerator : MonoBehaviour
     {
-        [SerializeField] private GeneratedMeshLoader meshLoader;
-
         private const int Count = 12;
         private const float StartSkip = 0.1f;
-        private const float LateralFraction = 0.35f;
+        // Stay inside the asphalt: walls sit at ±width/2, pickups have a
+        // ~0.55 m trigger, so leave that plus a little extra off each edge.
+        private const float EdgeClearance = 1.1f;
         private const float Height = 0.7f;
         private const float PickupScale = 0.9f;
         private const float TriggerRadius = 0.55f;
         private const float RespawnDelay = 0.45f;
         private const float MinRespawnDistance = 14f;
 
-        private readonly IAssetResolver resolver = new AssetResolver();
-        private readonly Dictionary<ObstacleKind, List<AssetDefinition>> kindSkins =
-            new Dictionary<ObstacleKind, List<AssetDefinition>>();
-        private readonly List<AssetDefinition> genericSkins = new List<AssetDefinition>();
-
         private GeneratedTrack track;
+        private List<Vector3> lane;
         private WorldRandom rng;
 
-        public void Configure(GeneratedMeshLoader loader)
-        {
-            if (loader != null) meshLoader = loader;
-        }
-
-        public void Generate(GeneratedTrack generatedTrack, WorldRecipe recipe, int recipeSeed)
+        public void Generate(GeneratedTrack generatedTrack, int recipeSeed)
         {
             StopAllCoroutines();
             ClearChildren();
@@ -52,25 +38,16 @@ namespace MarioKart.World
             track = generatedTrack;
             if (track == null || track.controlPoints == null || track.controlPoints.Count < 2) return;
 
+            lane = TrackMeshBuilder.SmoothLoop(track.controlPoints);
+
             int salt = unchecked(System.Environment.TickCount);
             int seed = WorldRandom.DeriveSeed(WorldRandom.DeriveSeed(recipeSeed, "obstacles"), salt.ToString());
             rng = new WorldRandom(seed);
 
-            BuildSkins(recipe);
-
             var kinds = MixKinds();
-            var placeholdersByType = new Dictionary<string, List<GameObject>>();
-            var definitions = new List<AssetDefinition>();
-
             for (int i = 0; i < Count; i++)
             {
-                var obstacle = Spawn(kinds[i], RandomPose(), out var skin);
-                if (skin != null) RegisterSkin(skin, obstacle, definitions, placeholdersByType);
-            }
-
-            if (meshLoader != null && definitions.Count > 0)
-            {
-                meshLoader.Begin(definitions, placeholdersByType);
+                Spawn(kinds[i], RandomPose());
             }
         }
 
@@ -84,49 +61,8 @@ namespace MarioKart.World
         private IEnumerator RespawnSoon()
         {
             yield return new WaitForSeconds(RespawnDelay);
-            if (track == null || rng == null) yield break;
-
-            var kind = (ObstacleKind)rng.NextInt(0, 3);
-            var obstacle = Spawn(kind, RandomPose(MinRespawnDistance), out var skin);
-            if (skin != null && skin.HasGeneratedMesh && meshLoader != null)
-            {
-                meshLoader.AttachPlaceholder(skin.objectType, obstacle);
-            }
-        }
-
-        private void BuildSkins(WorldRecipe recipe)
-        {
-            kindSkins.Clear();
-            genericSkins.Clear();
-            kindSkins[ObstacleKind.Boost] = new List<AssetDefinition>();
-            kindSkins[ObstacleKind.Paralyze] = new List<AssetDefinition>();
-            kindSkins[ObstacleKind.Spin] = new List<AssetDefinition>();
-
-            if (recipe?.objects == null) return;
-
-            foreach (var entry in recipe.objects)
-            {
-                if (entry == null || string.IsNullOrEmpty(entry.type)) continue;
-                var definition = resolver.Resolve(entry);
-                genericSkins.Add(definition);
-                if (ObstacleCatalog.TryKindForLabel(entry.type, out var kind))
-                {
-                    kindSkins[kind].Add(definition);
-                }
-            }
-        }
-
-        private AssetDefinition PickSkin(ObstacleKind kind)
-        {
-            if (kindSkins.TryGetValue(kind, out var preferred) && preferred.Count > 0)
-            {
-                return preferred[rng.NextInt(0, preferred.Count)];
-            }
-            if (genericSkins.Count > 0)
-            {
-                return genericSkins[rng.NextInt(0, genericSkins.Count)];
-            }
-            return null;
+            if (track == null || lane == null || rng == null) yield break;
+            Spawn((ObstacleKind)rng.NextInt(0, 3), RandomPose(MinRespawnDistance));
         }
 
         private List<ObstacleKind> MixKinds()
@@ -153,11 +89,9 @@ namespace MarioKart.World
             return kinds;
         }
 
-        private GameObject Spawn(ObstacleKind kind, Pose pose, out AssetDefinition skin)
+        private GameObject Spawn(ObstacleKind kind, Pose pose)
         {
-            skin = PickSkin(kind);
-
-            var go = new GameObject(skin != null ? $"Obstacle_{kind}_{skin.objectType}" : $"Obstacle_{kind}");
+            var go = new GameObject($"Obstacle_{kind}");
             go.transform.SetParent(transform, worldPositionStays: false);
             go.transform.SetPositionAndRotation(pose.position, pose.rotation);
 
@@ -165,57 +99,45 @@ namespace MarioKart.World
             trigger.isTrigger = true;
             trigger.radius = TriggerRadius;
 
-            BuildVisual(go.transform, kind, skin);
+            BuildVisual(go.transform, kind);
 
             var obstacle = go.AddComponent<TrackObstacle>();
             obstacle.Configure(kind, rng.NextFloat() * Mathf.PI * 2f, this);
             return go;
         }
 
-        private static void BuildVisual(Transform root, ObstacleKind kind, AssetDefinition skin)
+        private static void BuildVisual(Transform root, ObstacleKind kind)
         {
-            PrimitiveType primitive = skin != null ? skin.fallbackPrimitive : PrimitiveType.Sphere;
-            var visual = GameObject.CreatePrimitive(primitive);
+            Color color = TrackObstacle.KindColor(kind);
+            GameObject visual;
+            switch (kind)
+            {
+                case ObstacleKind.Boost:
+                    visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                    visual.transform.localScale = new Vector3(0.55f, 0.55f, 0.55f) * PickupScale;
+                    visual.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+                    break;
+                case ObstacleKind.Paralyze:
+                    visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    visual.transform.localScale = Vector3.one * (PickupScale * 0.75f);
+                    break;
+                default:
+                    visual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    visual.transform.localScale = new Vector3(PickupScale, PickupScale * 0.22f, PickupScale);
+                    break;
+            }
+
             visual.name = "Visual";
             visual.transform.SetParent(root, worldPositionStays: false);
             visual.transform.localPosition = Vector3.zero;
-            visual.transform.localRotation = Quaternion.identity;
-            visual.transform.localScale = PickupScaleOf(skin);
-
             var visualCollider = visual.GetComponent<Collider>();
             if (visualCollider != null) Destroy(visualCollider);
 
             var renderer = visual.GetComponent<Renderer>();
             if (renderer != null)
             {
-                Color tint = skin != null ? Color.Lerp(skin.tintColor, TrackObstacle.KindColor(kind), 0.35f)
-                                          : TrackObstacle.KindColor(kind);
-                renderer.material.color = tint;
+                renderer.sharedMaterial = GhibliLook.Lit(color);
             }
-        }
-
-        private static Vector3 PickupScaleOf(AssetDefinition skin)
-        {
-            if (skin == null) return Vector3.one * PickupScale;
-            Vector3 s = skin.defaultScale;
-            float max = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
-            if (max < 0.0001f) return Vector3.one * PickupScale;
-            return s / max * PickupScale;
-        }
-
-        private static void RegisterSkin(
-            AssetDefinition skin,
-            GameObject obstacle,
-            List<AssetDefinition> definitions,
-            Dictionary<string, List<GameObject>> placeholdersByType)
-        {
-            if (!placeholdersByType.TryGetValue(skin.objectType, out var list))
-            {
-                list = new List<GameObject>();
-                placeholdersByType[skin.objectType] = list;
-                definitions.Add(skin);
-            }
-            list.Add(obstacle);
         }
 
         private Pose RandomPose(float minDistanceFromExisting = 0f)
@@ -240,13 +162,14 @@ namespace MarioKart.World
 
         private Pose SamplePose(float t)
         {
-            t += rng.NextRange(-0.015f, 0.015f);
-            SampleTrack(track, t, out Vector3 center, out Vector3 tangent);
+            t = Mathf.Repeat(t, 1f);
+            SampleLane(lane, t, out Vector3 center, out Vector3 tangent);
             Vector3 across = Vector3.Cross(Vector3.up, tangent);
             if (across.sqrMagnitude < 0.0001f) across = Vector3.right;
             across.Normalize();
 
-            float lateral = rng.NextRange(-LateralFraction, LateralFraction) * (track.width * 0.5f);
+            float maxLateral = Mathf.Max(0.2f, track.width * 0.5f - EdgeClearance);
+            float lateral = rng.NextRange(-maxLateral, maxLateral);
             Vector3 position = center + across * lateral;
             position.y = Height;
             return new Pose(position, Quaternion.LookRotation(tangent, Vector3.up));
@@ -273,9 +196,8 @@ namespace MarioKart.World
             }
         }
 
-        private static void SampleTrack(GeneratedTrack track, float t, out Vector3 position, out Vector3 tangent)
+        private static void SampleLane(List<Vector3> points, float t, out Vector3 position, out Vector3 tangent)
         {
-            var points = track.controlPoints;
             int n = points.Count;
             float scaled = Mathf.Repeat(t, 1f) * n;
             int i0 = Mathf.FloorToInt(scaled) % n;
@@ -287,12 +209,13 @@ namespace MarioKart.World
             tangent.y = 0f;
             if (tangent.sqrMagnitude < 0.0001f)
             {
-                tangent = WorldGenerator.TangentAt(track, i0);
+                Vector3 prev = points[(i0 - 1 + n) % n];
+                Vector3 next = points[(i0 + 1) % n];
+                tangent = next - prev;
+                tangent.y = 0f;
             }
-            else
-            {
-                tangent.Normalize();
-            }
+            if (tangent.sqrMagnitude > 0.0001f) tangent.Normalize();
+            else tangent = Vector3.forward;
         }
     }
 }
