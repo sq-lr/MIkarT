@@ -59,3 +59,14 @@ explicitly out of scope (CLAUDE.md).
   (Meshy) but never affects layout.
 - A real LLM-based world synthesis (theme/palette/track from the same
   Claude call) is a natural next step but not part of this decision.
+
+**Amendment (2026-09-19) — optional wait on the Unity side.** Playtesting
+showed the mesh swap mid-race was distracting, so Unity now has
+`GameConfig.waitForGeneratedMeshes` (default **on**): after building the
+world it holds the "Generating" screen — showing per-task progress from
+`GET /assets/{task_id}` — until every mesh has landed, failed, or
+`meshWaitTimeoutSeconds` (default 300 s) elapses, then starts the countdown.
+The backend contract is unchanged and still returns immediately; the wait is
+purely a client-side choice. Rule 6 still holds: on timeout or failure the
+race starts on placeholders, and a mesh that finishes later still swaps in.
+Set the flag off to get the original stream-in behaviour.

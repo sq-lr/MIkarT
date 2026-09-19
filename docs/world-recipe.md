@@ -13,7 +13,7 @@ Canonical schema: [`../schemas/world_recipe.schema.json`](../schemas/world_recip
 | Field | Type | Notes |
 |---|---|---|
 | `version` | integer, `1` | Bump on breaking schema changes. Consumers should log a warning (not crash) on an unrecognized version — see `WorldRecipeClient.cs`. |
-| `seed` | integer ≥ 0 | Master seed. All procedural systems derive sub-seeds from this via `WorldRandom.DeriveSeed(seed, label)` — see `docs/decisions/0004-seed-derivation.md`. |
+| `seed` | integer, 0 – 2 147 483 647 | Master seed (must fit a signed 32-bit int — Unity's `WorldRecipe.seed` is an `int`). All procedural systems derive sub-seeds from this via `WorldRandom.DeriveSeed(seed, label)` — see `docs/decisions/0004-seed-derivation.md`. |
 | `world.name` | string | Display name, e.g. "Tropical Paradise". |
 | `world.theme` | string | Free-text theme label for display/logging. Not used for asset lookups. |
 | `world.terrain` | enum: `sand`, `grass`, `snow`, `dirt`, `rock`, `mud` | Drives ground material selection. |

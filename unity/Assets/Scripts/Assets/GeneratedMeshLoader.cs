@@ -31,6 +31,32 @@ namespace MarioKart.AssetsSystem
         private readonly List<GltfImport> imports = new List<GltfImport>();
         private Transform templateRoot;
 
+        // Progress for whoever wants to wait on us (GameManager's optional
+        // "hold the Generating screen until meshes land") or show status.
+        private readonly Dictionary<string, int> progressByType = new Dictionary<string, int>();
+        private int pending;
+
+        /// <summary>True while any mesh is still being polled, downloaded or imported.</summary>
+        public bool IsLoading => pending > 0;
+        /// <summary>Mesh tasks started by the last Begin().</summary>
+        public int Total { get; private set; }
+        /// <summary>Tasks finished (swapped in, failed, or timed out).</summary>
+        public int Completed => Total - pending;
+        /// <summary>0..1 across all tasks, from the backend's per-task progress.</summary>
+        public float Progress
+        {
+            get
+            {
+                if (Total == 0) return 1f;
+                float sum = 0f;
+                foreach (var value in progressByType.Values) sum += Mathf.Clamp01(value / 100f);
+                return sum / Total;
+            }
+        }
+
+        /// <summary>Fired whenever progress or completion state changes.</summary>
+        public event System.Action OnProgress;
+
         /// <summary>
         /// Cancel in-flight loads and drop imported templates. Called by
         /// EnvironmentGenerator before it rebuilds the environment.
@@ -38,6 +64,9 @@ namespace MarioKart.AssetsSystem
         public void Clear()
         {
             StopAllCoroutines();
+            pending = 0;
+            Total = 0;
+            progressByType.Clear();
             cache.ClearMeshTemplates();
             foreach (var import in imports)
             {
@@ -71,8 +100,30 @@ namespace MarioKart.AssetsSystem
                 if (!definition.HasGeneratedMesh) continue;
                 if (!placeholdersByType.TryGetValue(definition.objectType, out var placeholders) || placeholders.Count == 0) continue;
 
-                StartCoroutine(LoadAndSwap(definition, placeholders, config));
+                Total++;
+                pending++;
+                progressByType[definition.objectType] = 0;
+                StartCoroutine(Tracked(definition, placeholders, config));
             }
+            OnProgress?.Invoke();
+        }
+
+        /// <summary>
+        /// Runs one load to completion (however it ends) and then books it
+        /// as finished, so IsLoading/Completed stay honest on every exit path.
+        /// </summary>
+        private IEnumerator Tracked(AssetDefinition definition, List<GameObject> placeholders, GameConfig config)
+        {
+            yield return LoadAndSwap(definition, placeholders, config);
+            progressByType[definition.objectType] = 100;
+            pending = Mathf.Max(0, pending - 1);
+            OnProgress?.Invoke();
+        }
+
+        private void ReportProgress(string objectType, int percent)
+        {
+            progressByType[objectType] = percent;
+            OnProgress?.Invoke();
         }
 
         private IEnumerator LoadAndSwap(AssetDefinition definition, List<GameObject> placeholders, GameConfig config)
@@ -89,6 +140,7 @@ namespace MarioKart.AssetsSystem
                 client.PollStatus(taskId, s => { status = s; done = true; }, e => { error = e; done = true; });
                 yield return new WaitUntil(() => done);
 
+                if (status != null) ReportProgress(definition.objectType, status.progress);
                 if (status != null && status.status == MeshTaskStatus.Ready) break;
 
                 if (status != null && status.status == MeshTaskStatus.Failed)

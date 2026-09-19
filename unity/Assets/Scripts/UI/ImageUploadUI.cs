@@ -159,10 +159,16 @@ namespace MarioKart.UI
         {
             if (pickedImageBytes == null) return;
 
+            // The backend also defaults a blank description, but don't rely
+            // on it: an empty form field used to come back as a 422 and a
+            // silent fallback to the offline world.
+            string description = string.IsNullOrWhiteSpace(descriptionField.text)
+                ? "a racing world inspired by this photo"
+                : descriptionField.text.Trim();
             var request = new WorldGenerationRequest(
                 pickedImageBytes,
                 pickedImageFileName,
-                descriptionField.text,
+                description,
                 SelectedSky());
             GameManager.Instance.SubmitWorldInput(request);
         }

@@ -29,14 +29,21 @@ def _clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
+# Unity deserializes `seed` into a signed 32-bit int (WorldRecipe.cs,
+# WorldRandom), and the schema caps it there. Derived seeds must fit.
+MAX_SEED = 2**31 - 1
+
+
 def derive_seed(*parts: str) -> int:
     """Deterministically derive a seed from arbitrary string parts.
 
     Used whenever an upstream seed is missing, so "same input -> same world"
-    still holds instead of falling back to a random or fixed value.
+    still holds instead of falling back to a random or fixed value. Masked to
+    31 bits so it always fits Unity's Int32 (a full 32-bit prefix overflowed
+    it and made Unity fall back to the default world).
     """
     digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
-    return int(digest[:8], 16)
+    return int(digest[:8], 16) & MAX_SEED
 
 
 class WorldInfo(BaseModel):
@@ -129,7 +136,7 @@ class WorldObjectEntry(BaseModel):
 
 class WorldRecipe(BaseModel):
     version: int = 1
-    seed: int | None = None
+    seed: int | None = Field(default=None, ge=0, le=MAX_SEED)
     world: WorldInfo
     track: TrackInfo
     objects: list[WorldObjectEntry] = Field(default_factory=list, max_length=12)

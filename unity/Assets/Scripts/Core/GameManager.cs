@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using MarioKart.AI;
 using MarioKart.Racing;
@@ -32,6 +33,16 @@ namespace MarioKart.Core
         public GameConfig Config => config;
         public GameState CurrentState { get; private set; } = GameState.Boot;
         public event Action<GameState> OnStateChanged;
+
+        /// <summary>
+        /// Human-readable progress while in GameState.Generating ("Waiting
+        /// for 3D models... 1/2 ready, 45%"). UI shows it; nothing else
+        /// depends on it.
+        /// </summary>
+        public string GenerationStatus { get; private set; } = "";
+        public event Action<string> OnGenerationStatusChanged;
+
+        private Coroutine meshWait;
 
         // Only these transitions are allowed; an illegal request is logged
         // and ignored rather than crashing a misconfigured UI panel.
@@ -99,7 +110,15 @@ namespace MarioKart.Core
         public void SubmitWorldInput(WorldGenerationRequest request)
         {
             TransitionTo(GameState.Generating);
+            SetGenerationStatus("Generating your world...");
             recipeClient.RequestWorldRecipe(request, OnRecipeReady, OnRecipeFailed);
+        }
+
+        private void SetGenerationStatus(string status)
+        {
+            if (status == GenerationStatus) return;
+            GenerationStatus = status;
+            OnGenerationStatusChanged?.Invoke(status);
         }
 
         private void OnRecipeReady(WorldRecipe recipe)
@@ -112,7 +131,7 @@ namespace MarioKart.Core
             Debug.LogWarning($"World generation failed, falling back to default world: {error}");
             if (config.fallbackToDefaultOnError)
             {
-                BuildWorldAndAdvance(DefaultWorldRecipe.Get());
+                StartCoroutine(FallBackToDefaultWorld(error));
             }
             else
             {
@@ -120,9 +139,51 @@ namespace MarioKart.Core
             }
         }
 
+        // Show *why* we're using the offline world for a few seconds before
+        // building it. A silent fallback is indistinguishable from success
+        // and sends people debugging the wrong thing.
+        private IEnumerator FallBackToDefaultWorld(string error)
+        {
+            SetGenerationStatus($"Couldn't generate from the backend:\n{error}\n\nUsing the offline world instead.");
+            yield return new WaitForSecondsRealtime(3f);
+            BuildWorldAndAdvance(DefaultWorldRecipe.Get());
+        }
+
         private void BuildWorldAndAdvance(WorldRecipe recipe)
         {
+            SetGenerationStatus("Building the track...");
             worldGenerator.Generate(recipe);
+
+            // Optionally hold here until the generated meshes have swapped in.
+            // The world (with placeholders) already exists behind the
+            // Generating screen; only the countdown is deferred.
+            var loader = worldGenerator.MeshLoader;
+            if (config.waitForGeneratedMeshes && loader != null && loader.IsLoading)
+            {
+                if (meshWait != null) StopCoroutine(meshWait);
+                meshWait = StartCoroutine(WaitForMeshesThenAdvance(loader));
+                return;
+            }
+
+            TransitionTo(GameState.WorldReady);
+        }
+
+        private IEnumerator WaitForMeshesThenAdvance(MarioKart.AssetsSystem.GeneratedMeshLoader loader)
+        {
+            float deadline = Time.realtimeSinceStartup + config.meshWaitTimeoutSeconds;
+            while (loader.IsLoading && Time.realtimeSinceStartup < deadline)
+            {
+                int percent = Mathf.RoundToInt(loader.Progress * 100f);
+                SetGenerationStatus($"Waiting for 3D models...\n{loader.Completed}/{loader.Total} ready · {percent}%");
+                yield return new WaitForSecondsRealtime(0.25f);
+            }
+
+            if (loader.IsLoading)
+            {
+                Debug.LogWarning($"GameManager: generated meshes still pending after {config.meshWaitTimeoutSeconds}s; starting on placeholders");
+            }
+
+            meshWait = null;
             TransitionTo(GameState.WorldReady);
         }
 
