@@ -15,6 +15,7 @@ namespace MarioKart.AI
         public string terrain;
         public string weather;
         public string time_of_day;
+        public string sky = "sunny";
     }
 
     [Serializable]

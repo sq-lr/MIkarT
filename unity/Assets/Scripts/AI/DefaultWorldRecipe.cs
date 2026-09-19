@@ -23,6 +23,7 @@ namespace MarioKart.AI
                     terrain = "grass",
                     weather = "clear",
                     time_of_day = "day",
+                    sky = "sunny",
                 },
                 track = new TrackInfo { width = 16f, length = 600f, difficulty = 0.4f },
                 objects = new List<WorldObjectEntry>

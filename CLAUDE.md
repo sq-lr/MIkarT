@@ -57,8 +57,11 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ Text-based key-asset extraction (Claude, text-only) for props named in the
   description but not necessarily in the photo, + Meshy text-to-3D meshes
   for them — see docs/decisions/0007-text-to-3d-key-assets.md
-✓ Async mesh delivery: race starts on primitive placeholders, generated
-  meshes swap in when ready (placeholders stay if generation fails)
+✓ Async mesh delivery: the world is built on primitive placeholders and
+  generated meshes swap in when ready (placeholders stay if generation
+  fails). By default the Generating screen waits for the meshes, with a
+  timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
+  turn it off to race immediately while they stream in
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
@@ -112,9 +115,11 @@ at minimum) — see `docs/development.md`'s conventions section.
    file's scope checklist when scope changes.
 6. **The game must survive AI failure.** Any backend error or timeout falls
    back to `DefaultWorldRecipe` in Unity so the game stays fully playable
-   offline. The race never waits on mesh generation: it starts on primitive
-   placeholders, and if a mesh fails, times out, or the provider is mocked,
-   the placeholder simply stays.
+   offline. The race can never be *blocked* by mesh generation: the world
+   is built on primitive placeholders, and if a mesh fails, times out, or
+   the provider is mocked, the placeholder simply stays. Waiting for meshes
+   on the Generating screen is allowed only behind a timeout
+   (`meshWaitTimeoutSeconds`) — see the amendment in ADR 0006.
 
 ## Repository structure
 

@@ -13,12 +13,13 @@ Canonical schema: [`../schemas/world_recipe.schema.json`](../schemas/world_recip
 | Field | Type | Notes |
 |---|---|---|
 | `version` | integer, `1` | Bump on breaking schema changes. Consumers should log a warning (not crash) on an unrecognized version — see `WorldRecipeClient.cs`. |
-| `seed` | integer ≥ 0 | Master seed. All procedural systems derive sub-seeds from this via `WorldRandom.DeriveSeed(seed, label)` — see `docs/decisions/0004-seed-derivation.md`. |
+| `seed` | integer, 0 – 2 147 483 647 | Master seed (must fit a signed 32-bit int — Unity's `WorldRecipe.seed` is an `int`). All procedural systems derive sub-seeds from this via `WorldRandom.DeriveSeed(seed, label)` — see `docs/decisions/0004-seed-derivation.md`. |
 | `world.name` | string | Display name, e.g. "Tropical Paradise". |
 | `world.theme` | string | Free-text theme label for display/logging. Not used for asset lookups. |
 | `world.terrain` | enum: `sand`, `grass`, `snow`, `dirt`, `rock`, `mud` | Drives ground material selection. |
 | `world.weather` | enum: `sunny`, `rainy`, `cloudy`, `snowy`, `clear` | Placeholder — not wired to any weather system yet. |
 | `world.time_of_day` | enum: `day`, `night`, `dusk`, `dawn` | Placeholder — not wired to any lighting rig yet beyond palette tinting. |
+| `world.sky` | enum: `sunny`, `cloudy`, `sunset`, `night` | Selected on the image-upload screen and applied to Unity camera backgrounds and ambient light. Defaults to `sunny` for older recipes. |
 | `track.width` | number, 4–20 | Meters. |
 | `track.length` | number, 100–2000 | Approximate loop length in meters; drives the loop radius in `TrackGenerator`. |
 | `track.difficulty` | number, 0–1 | Controls how much the loop's curvature is perturbed. |

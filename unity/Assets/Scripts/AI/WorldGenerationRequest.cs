@@ -10,12 +10,14 @@ namespace MarioKart.AI
         public byte[] imageBytes;
         public string imageFileName;
         public string description;
+        public string sky;
 
-        public WorldGenerationRequest(byte[] imageBytes, string imageFileName, string description)
+        public WorldGenerationRequest(byte[] imageBytes, string imageFileName, string description, string sky)
         {
             this.imageBytes = imageBytes;
             this.imageFileName = imageFileName;
             this.description = description;
+            this.sky = sky;
         }
     }
 }

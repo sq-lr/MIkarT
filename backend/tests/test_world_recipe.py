@@ -27,6 +27,7 @@ VALID_RECIPE = {
         "terrain": "sand",
         "weather": "sunny",
         "time_of_day": "day",
+        "sky": "sunny",
     },
     "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5},
     "objects": [
@@ -85,6 +86,22 @@ def test_invalid_density_normalized():
     assert recipe.objects[1].density == 0.0
 
 
+def test_derived_seeds_fit_unity_int32():
+    from app.models.world_recipe import MAX_SEED, derive_seed
+
+    # "Tropical Paradise" used to hash to 2745161991 (> Int32.MaxValue) and
+    # made Unity reject the whole recipe. Check that and a spread of inputs.
+    assert derive_seed("Tropical Paradise", "tropical beach") <= MAX_SEED
+    assert all(0 <= derive_seed(f"input-{i}") <= MAX_SEED for i in range(500))
+
+    data = json.loads(json.dumps(VALID_RECIPE))
+    data["seed"] = MAX_SEED + 1
+    with pytest.raises(ValidationError):
+        WorldRecipe.model_validate(data)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(data, _load_schema())
+
+
 def test_missing_seed_handled_deterministically():
     data = json.loads(json.dumps(VALID_RECIPE))
     del data["seed"]
@@ -101,6 +118,14 @@ def test_missing_world_fields_rejected():
     del data["world"]
     with pytest.raises(ValidationError):
         WorldRecipe.model_validate(data)
+
+
+def test_generate_world_endpoint_accepts_blank_description():
+    client = TestClient(app)
+    for data in ({}, {"description": ""}, {"description": "   "}):
+        response = client.post("/generate-world", files={"image": ("test.png", make_png(), "image/png")}, data=data)
+        assert response.status_code == 200, data
+        jsonschema.validate(response.json()["world_recipe"], _load_schema())
 
 
 def test_generate_world_endpoint_returns_valid_recipe():
@@ -145,6 +170,15 @@ def test_synthesis_is_deterministic():
     assert recipe_a.model_dump() == recipe_b.model_dump()
     # No detections -> the theme profile's canned objects are used.
     assert [o.type for o in recipe_a.objects] == ["palm_tree", "rock"]
+
+
+def test_synthesis_preserves_selected_sky():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+
+    recipe = service.synthesize(scene, "make it a beach paradise", sky="sunset")
+
+    assert recipe.world.sky == "sunset"
 
 
 def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():

@@ -47,6 +47,7 @@ class WorldSynthesisService(ABC):
         mesh_tasks: list[MeshTask] | None = None,
         text_assets: list[ExtractedAsset] | None = None,
         text_mesh_tasks: list[MeshTask] | None = None,
+        sky: str = "sunny",
     ) -> WorldRecipe:
         """`mesh_tasks` are the in-flight mesh generations for this world, one
         per detected object type that was successfully submitted; each becomes
@@ -226,6 +227,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
         mesh_tasks: list[MeshTask] | None = None,
         text_assets: list[ExtractedAsset] | None = None,
         text_mesh_tasks: list[MeshTask] | None = None,
+        sky: str = "sunny",
     ) -> WorldRecipe:
         profile_key = _pick_profile_key(scene, description)
         profile = _THEME_PROFILES[profile_key]
@@ -254,6 +256,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
                 terrain=profile["terrain"],
                 weather=profile["weather"],
                 time_of_day=profile["time_of_day"],
+                sky=sky,
             ),
             track=TrackInfo(width=16.0, length=800.0, difficulty=0.5),
             objects=objects,
