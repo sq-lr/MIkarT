@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mariokart-hackathon.local/schemas/world_recipe.schema.json",
+  "title": "WorldRecipe",
+  "description": "The versioned contract produced by the AI backend and consumed by Unity. AI decides WHAT the world should be; Unity decides HOW to build it. See docs/world-recipe.md for field-by-field documentation.",
+  "type": "object",
+  "required": ["version", "seed", "world", "track", "objects", "palette"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Schema version. Bump on breaking changes. Consumers should warn (not crash) on an unrecognized version.",
+      "type": "integer",
+      "const": 1
+    },
+    "seed": {
+      "description": "Master seed for deterministic generation. All procedural systems must derive their randomness from this value (see WorldRandom.DeriveSeed).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "world": {
+      "type": "object",
+      "required": ["name", "theme", "terrain", "weather", "time_of_day"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "theme": {
+          "description": "Free-text theme label used for display/logging (e.g. 'tropical beach'). Not used for asset lookups; terrain/weather/time_of_day are.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "terrain": {
+          "type": "string",
+          "enum": ["sand", "grass", "snow", "dirt", "rock", "mud"]
+        },
+        "weather": {
+          "type": "string",
+          "enum": ["sunny", "rainy", "cloudy", "snowy", "clear"]
+        },
+        "time_of_day": {
+          "type": "string",
+          "enum": ["day", "night", "dusk", "dawn"]
+        }
+      }
+    },
+    "track": {
+      "type": "object",
+      "required": ["width", "length", "difficulty"],
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "description": "Track width in meters.",
+          "type": "number",
+          "minimum": 4.0,
+          "maximum": 20.0
+        },
+        "length": {
+          "description": "Approximate total loop length in meters.",
+          "type": "number",
+          "minimum": 100.0,
+          "maximum": 2000.0
+        },
+        "difficulty": {
+          "description": "Normalized difficulty, controls how much the loop curvature is perturbed.",
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    "objects": {
+      "description": "Environment decoration types and their relative density. Bootstrap scope: decoration only, never obstacles/hazards.",
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["type", "density"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "density": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          }
+        }
+      }
+    },
+    "palette": {
+      "description": "Ordered list of hex colors Unity applies to lighting/ground/skybox placeholders.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "pattern": "^#[0-9A-Fa-f]{6}$"
+      }
+    }
+  }
+}
