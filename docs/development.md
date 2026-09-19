@@ -66,11 +66,11 @@ names, so the builder logs an error naming the field if a script renames one.
 | ↳ `EnvironmentGenerator` | `World/EnvironmentGenerator` **and** `Assets/GeneratedMeshLoader` on the same GameObject (not a child — `Generate()` destroys children) | `meshLoader` → self; `GeneratedMeshLoader.client` → `MeshAssetClient` |
 | ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon and two `TrackBarrier` walls (mesh colliders) | — |
 | ↳ `Checkpoints` | empty; `WorldGenerator` fills it at runtime with trigger gates facing the track tangent | — |
-| ↳ `Ground` | Plane ×40 at y = −0.05 | palette-tinted via `groundRenderer` |
+| ↳ `Ground` | Plane ×60 (600 m) at y = −0.05 | palette-tinted via `groundRenderer` |
 | `Directional Light` | `Light` | palette-tinted via `sunLight` |
 | `RaceManager` | `Racing/RaceManager` | `players` → both `LapManager`s |
 | `RaceBootstrap` | `Racing/RaceBootstrap` — the glue: on `WorldReady` parks the karts on the start line and starts the countdown, on `Racing` unfreezes them, sets split-screen viewports | `worldGenerator`, `raceManager`, `karts[2]`, `cameras[2]` |
-| `Kart_P1` / `Kart_P2` | Cube + `Rigidbody` + `Players/KartController` + `Players/PlayerController` + `Input/PlayerInput` (WASD / arrows) + `Racing/LapManager` | `rb`, `input`, `kart`, `playerIndex` |
+| `Kart_P1` / `Kart_P2` | Cube + `Rigidbody` + `Players/KartController` + `Players/PlayerController` + `Input/PlayerInput` (WASD / arrows) + `Racing/LapManager` + `Players/KartSpeedEffect` (top-speed exhaust flames) + `Players/KartSkidEffect` (smoke, sparks, skid marks on contact; both built in code) | `rb`, `input`, `kart`, `playerIndex` |
 | `Camera_P1` / `Camera_P2` | `Camera` (top / bottom half) + `Camera/PlayerCamera`; `AudioListener` on P1 only | `cam`, `target` |
 | `Canvas` | Screen-space overlay, 1920×1080 scaler | — |
 | ↳ `LobbyUI` … `ResultsUI` | one always-active holder per `UI/*.cs` script (`LobbyUI`, `ImageUploadUI`, `GenerationUI`, `RaceHUD`, `ResultsUI`), each with a `Panel` child that the script shows/hides. The script must **not** sit on the panel itself: it unsubscribes from `GameManager` in `OnDisable`, so hiding its own GameObject would deafen it permanently | `panel` → the child, buttons, texts, `RaceHUD.player1Laps/player2Laps` |

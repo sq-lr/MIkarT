@@ -29,8 +29,20 @@ with the origin at the top-left of the image. The crop must contain the whole \
 object with minimal background so it can be converted into a standalone 3D model.
   - prominence: 0.0 to 1.0, how much of the scene this kind of object should \
 populate (large or frequently repeated objects score high).
+  - placement: how the game should use this object, exactly one of:
+      "landmark"   -- the visual centrepiece of the photo (a lighthouse, a statue, \
+a temple, one big distinctive building). It is placed once or twice, oversized, at \
+key points of the track.
+      "roadside"   -- things that line a path or road at regular intervals (lamp \
+posts, fences, bollards, planters, palms along a promenade, market stalls).
+      "background" -- large distant things that form a skyline (mountains, cliffs, \
+skyscrapers, far-off buildings, wind turbines).
+      "scattered"  -- everything else: natural or casual clutter distributed in \
+groups (rocks, bushes, trees, barrels, crates).
 
 Rules:
+- At most ONE object may be "landmark". Use it only for a clear centrepiece; if \
+nothing stands out, give no object that placement.
 - Only static decoration: plants, rocks, furniture, signs, vehicles-as-scenery, \
 buildings, etc. Never people, animals' faces, text, logos, or the ground/sky itself.
 - Prefer objects that are fully visible and not heavily occluded.

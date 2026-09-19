@@ -30,7 +30,7 @@ VALID_RECIPE = {
     },
     "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5},
     "objects": [
-        {"type": "palm_tree", "density": 0.5, "asset": {"task_id": "0193a0c1-abcd", "provider": "meshy"}},
+        {"type": "palm_tree", "density": 0.5, "placement": "roadside", "asset": {"task_id": "0193a0c1-abcd", "provider": "meshy"}},
         {"type": "rock", "density": 0.2},
     ],
     "palette": ["#2E8B57", "#F4D35E", "#2D9CDB"],
@@ -46,6 +46,23 @@ def test_valid_recipe_accepted():
     assert recipe.world.name == "Tropical Paradise"
     assert recipe.seed == 482913
     jsonschema.validate(json.loads(recipe.model_dump_json()), _load_schema())
+
+
+def test_placement_is_optional_defaults_to_scattered_and_is_validated():
+    recipe = WorldRecipe.model_validate(VALID_RECIPE)
+    assert recipe.objects[0].placement == "roadside"
+    assert recipe.objects[1].placement == "scattered"  # absent in the input
+    # We always emit it, and the schema accepts every value we can emit.
+    dumped = json.loads(recipe.model_dump_json(exclude_none=True))
+    assert dumped["objects"][1]["placement"] == "scattered"
+    jsonschema.validate(dumped, _load_schema())
+
+    data = json.loads(json.dumps(VALID_RECIPE))
+    data["objects"][0]["placement"] = "floating"
+    with pytest.raises(ValidationError):
+        WorldRecipe.model_validate(data)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(data, _load_schema())
 
 
 def test_asset_is_optional_and_validated():
@@ -146,9 +163,38 @@ def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
 
     recipe = service.synthesize(scene, "beach", tasks)
 
-    assert [(o.type, o.density) for o in recipe.objects] == [("lantern", 0.35), ("rock", 0.2)]
-    assert recipe.objects[0].asset is not None and recipe.objects[0].asset.task_id == "task-lantern"
-    assert recipe.objects[1].asset is None
+    # Most prominent first (readability only), and a duplicate label
+    # collapses into its most prominent occurrence.
+    assert [(o.type, o.density) for o in recipe.objects] == [("rock", 0.9), ("lantern", 0.35)]
+    assert recipe.objects[0].asset is None
+    assert recipe.objects[1].asset is not None and recipe.objects[1].asset.task_id == "task-lantern"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_passes_placement_through_and_allows_one_landmark():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["harbour"],
+        detected_objects=[
+            DetectedObject(label="lamp_post", bbox=[0.1, 0.1, 0.1, 0.4], prominence=0.3, placement="roadside"),
+            DetectedObject(label="lighthouse", bbox=[0.4, 0.0, 0.2, 0.9], prominence=0.6, placement="landmark"),
+            DetectedObject(label="mountain", bbox=[0.0, 0.0, 1.0, 0.4], prominence=0.5, placement="background"),
+            DetectedObject(label="statue", bbox=[0.7, 0.5, 0.2, 0.4], prominence=0.4, placement="landmark"),  # second landmark
+            DetectedObject(label="crate", bbox=[0.8, 0.8, 0.1, 0.1], prominence=0.1),  # no hint -> scattered
+        ],
+    )
+
+    recipe = service.synthesize(scene, "harbour at dusk")
+
+    assert {o.type: o.placement for o in recipe.objects} == {
+        "lighthouse": "landmark",  # most prominent landmark wins
+        "mountain": "background",
+        "statue": "scattered",  # demoted: only one landmark per recipe
+        "lamp_post": "roadside",
+        "crate": "scattered",
+    }
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
 
 

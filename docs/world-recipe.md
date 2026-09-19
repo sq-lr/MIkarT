@@ -23,7 +23,8 @@ Canonical schema: [`../schemas/world_recipe.schema.json`](../schemas/world_recip
 | `track.length` | number, 100–2000 | Approximate loop length in meters; drives the loop radius in `TrackGenerator`. |
 | `track.difficulty` | number, 0–1 | Controls how much the loop's curvature is perturbed. |
 | `objects[].type` | string | The snake_case label an object was given, either by the vision model (an object it found in the photo, e.g. `palm_tree`, `lantern`) or by the text-asset extractor (a prop the player's description named that may not be in the photo, e.g. `whale_statue`) — indistinguishable in this field. Open vocabulary. `AssetResolver` has tuned placeholders for common labels and a keyword heuristic for the rest. |
-| `objects[].density` | number, 0–1 | From the VLM's `prominence` for a photo-detected object, or the text extractor's own `density` for a text-derived one. Placeholder linear density → instance count model in `EnvironmentGenerator`. |
+| `objects[].density` | number, 0–1 | From the VLM's `prominence` for a photo-detected object, or the text extractor's own `density` for a text-derived one. For `scattered` types `EnvironmentGenerator` turns it into an instance count (`density × 1.5 × control points`) placed in clusters within a subset of track zones; for `roadside` types it sets the spacing (40 m at 0 → 12 m at 1). The backend lists objects most-prominent first for readability only — order carries no meaning. |
+| `objects[].placement` | enum: `landmark`, `roadside`, `background`, `scattered`; optional, default `scattered` | The VLM's judgement of how a photo-detected object should be used. `landmark` (at most one per recipe — the backend demotes extras): the centrepiece, placed once or twice, oversized, opposite the finish line and at the sharpest bend, facing the track; no small copies. `roadside`: lines the road at regular intervals on both sides, facing it (lamp posts, fences, palms on a promenade). `background`: horizon layer only — a few 5–8× copies 80–150 m out, tinted toward the sky. `scattered`: zoned clusters of varied copies (rocks, bushes, trees). Text-extracted objects don't get a placement judgement yet, so they always default to `scattered`. Added backwards-compatibly: `version` stays 1, and Unity treats a missing value as `scattered`. |
 | `objects[].asset` | object or absent | `{ "task_id", "provider": "meshy" }` — handle to the mesh being generated, either from this object's image crop (Meshy Image-to-3D) or from a text-extracted prompt (Meshy Text-to-3D, see `docs/decisions/0007-text-to-3d-key-assets.md`) — both look identical here. Unity polls `GET /assets/{task_id}` and swaps the GLB in when `ready`. Absent when no mesh was requested (mock provider, offline fallback, crop too small) or the submit failed; Unity then keeps the placeholder. |
 | `palette` | array of hex colors, 1–8 | `palette[0]` tints the sun light, `palette[1]` tints the placeholder ground material. |
 
@@ -53,8 +54,8 @@ change.
     "difficulty": 0.5
   },
   "objects": [
-    { "type": "palm_tree", "density": 0.5, "asset": { "task_id": "0193a0c1-7f1e-7c3a-9b1d-2f0e4a6c8d10", "provider": "meshy" } },
-    { "type": "rock", "density": 0.2 }
+    { "type": "palm_tree", "density": 0.5, "placement": "roadside", "asset": { "task_id": "0193a0c1-7f1e-7c3a-9b1d-2f0e4a6c8d10", "provider": "meshy" } },
+    { "type": "rock", "density": 0.2, "placement": "scattered" }
   ],
   "palette": ["#2E8B57", "#F4D35E", "#2D9CDB"]
 }

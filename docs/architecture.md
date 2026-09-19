@@ -37,7 +37,7 @@ served by the backend.
 - **WorldRecipeClient** (Unity): POSTs the single world input, parses the response into a `WorldRecipe`, or reports an error.
 - **MeshAssetClient** (Unity): polls `GET /assets/{task_id}` and downloads `model.glb`. Together with `WorldRecipeClient` this is Unity's entire network surface.
 - **GameManager** (Unity): owns the `GameState` machine and orchestrates the flow between UI, the backend call, and world generation.
-- **WorldGenerator / TrackGenerator / EnvironmentGenerator** (Unity): turn a `WorldRecipe` into an actual scene — one loop track, checkpoints, and placeholder environment objects, all deterministic from `recipe.seed`.
+- **WorldGenerator / TrackGenerator / EnvironmentGenerator** (Unity): turn a `WorldRecipe` into an actual scene — one loop track (road mesh + barrier walls + finish line), checkpoints, and a composed placeholder environment driven by the VLM's per-object `placement` hint (landmarks at key spots, roadside lines, a far horizon layer, zoned clusters of scattered filler, per-instance scale/mirror/tilt/tint variation), all deterministic from `recipe.seed`.
 - **AssetResolver** (Unity): maps a recipe object entry to the primitive placeholder to spawn now (tuned for known labels, keyword heuristic for anything the VLM invents) plus the mesh task that will replace it.
 - **GeneratedMeshLoader** (Unity): for each mesh task, polls until ready, downloads the GLB, imports it once with glTFast, and places a copy over every placeholder of that type without moving it. Failure/timeout leaves the placeholder.
 

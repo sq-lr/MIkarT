@@ -26,7 +26,9 @@ AI backend (FastAPI, mock by default)
   Meshy Text-to-3D         → one async mesh task per extracted text asset
         ↓
 WorldRecipe (versioned JSON contract — schemas/world_recipe.schema.json)
-  objects[].type  = VLM label or text-extracted label,  objects[].asset = {task_id} (optional)
+  objects[].type = VLM label or text-extracted label, objects[].placement =
+  VLM hint (landmark | roadside | background | scattered), objects[].asset
+  = {task_id} (optional)
         ↓
 Unity (WorldGenerator → TrackGenerator + EnvironmentGenerator)
         ↓

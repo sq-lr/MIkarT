@@ -184,9 +184,16 @@ namespace MarioKart.AssetsSystem
         private static void PlaceOver(GameObject template, GameObject placeholder)
         {
             var placeholderRenderer = placeholder.GetComponent<Renderer>();
-            // Match the placeholder's visual height; its position is the ground
-            // point (primitives are centred on it), so rest the mesh's bottom there.
+            // Match the placeholder's visual height, and rest the mesh's
+            // bottom where the placeholder's bottom is (EnvironmentGenerator
+            // stands placeholders on the ground, with per-instance scale,
+            // tilt and sink -- all of which should carry over to the mesh).
             float targetHeight = placeholderRenderer != null ? placeholderRenderer.bounds.size.y : placeholder.transform.localScale.y;
+            Vector3 groundPoint = placeholder.transform.position;
+            if (placeholderRenderer != null) groundPoint.y = placeholderRenderer.bounds.min.y;
+
+            // A mirrored placeholder (negative X scale) mirrors the mesh too.
+            bool mirrored = placeholder.transform.localScale.x < 0f;
 
             // Copies go next to the placeholder, not under it, so the
             // placeholder's non-uniform scale doesn't distort the mesh.
@@ -201,9 +208,9 @@ namespace MarioKart.AssetsSystem
             if (bounds.HasValue && bounds.Value.size.y > 0.0001f)
             {
                 float scale = targetHeight / bounds.Value.size.y;
-                copy.transform.localScale = Vector3.one * scale;
+                copy.transform.localScale = new Vector3(mirrored ? -scale : scale, scale, scale);
                 var scaled = CombinedBounds(copy).Value;
-                var groundOffset = placeholder.transform.position - new Vector3(scaled.center.x, scaled.min.y, scaled.center.z);
+                var groundOffset = groundPoint - new Vector3(scaled.center.x, scaled.min.y, scaled.center.z);
                 copy.transform.position += groundOffset;
             }
 

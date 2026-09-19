@@ -18,6 +18,10 @@ _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
 _ASSET_PROVIDER_VALUES = {"meshy"}
+# How Unity should use an object, as judged by the vision model. Mirrors the
+# enum in the schema and DetectedObject.placement in vision_service.py.
+PLACEMENT_VALUES = {"landmark", "roadside", "background", "scattered"}
+DEFAULT_PLACEMENT = "scattered"
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -95,6 +99,8 @@ class ObjectAsset(BaseModel):
 class WorldObjectEntry(BaseModel):
     type: str = Field(min_length=1, max_length=40)
     density: float
+    # Optional in the schema (absent == "scattered"); we always emit it.
+    placement: str = DEFAULT_PLACEMENT
     # Optional: absent when no mesh was generated for this type (mock mesh
     # provider, Meshy submit failure, or the offline DefaultWorldRecipe).
     asset: ObjectAsset | None = None
@@ -103,6 +109,13 @@ class WorldObjectEntry(BaseModel):
     @classmethod
     def _clamp_density(cls, v: float) -> float:
         return _clamp(v, 0.0, 1.0)
+
+    @field_validator("placement")
+    @classmethod
+    def _valid_placement(cls, v: str) -> str:
+        if v not in PLACEMENT_VALUES:
+            raise ValueError(f"placement must be one of {sorted(PLACEMENT_VALUES)}")
+        return v
 
 
 class WorldRecipe(BaseModel):

@@ -14,10 +14,16 @@ import base64
 import hashlib
 import logging
 from abc import ABC, abstractmethod
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
+
+# A Literal (not a str + validator) so that when SceneUnderstanding is used as
+# Claude's structured-output schema the model is constrained to these values.
+# Keep in sync with PLACEMENT_VALUES in app.models.world_recipe.
+Placement = Literal["landmark", "roadside", "background", "scattered"]
 
 
 class DetectedObject(BaseModel):
@@ -25,13 +31,16 @@ class DetectedObject(BaseModel):
 
     `bbox` is normalized [x, y, width, height] in 0..1, origin top-left. It is
     cropped out of the source image (see object_cropper) and sent to the mesh
-    provider; `label` becomes WorldRecipe.objects[].type and `prominence`
-    becomes objects[].density.
+    provider; `label` becomes WorldRecipe.objects[].type, `prominence`
+    becomes objects[].density and `placement` becomes objects[].placement --
+    the VLM's judgement of how the object should be used in the world
+    (see the prompt in app.prompts.object_extraction).
     """
 
     label: str = Field(min_length=1, max_length=40)
     bbox: list[float] = Field(min_length=4, max_length=4)
     prominence: float = Field(ge=0.0, le=1.0)
+    placement: Placement = "scattered"
 
     @field_validator("bbox")
     @classmethod
@@ -53,15 +62,17 @@ class SceneUnderstanding(BaseModel):
 
 # Deterministic canned profiles the mock picks between, keyed by a hash of the
 # image bytes. The detected_objects are made up (they don't correspond to
-# anything in the real image) but exercise the crop -> mesh pipeline offline.
+# anything in the real image) but exercise the crop -> mesh pipeline offline,
+# and between them cover every placement value so Unity's placement paths
+# can be tested without a real VLM.
 _MOCK_PROFILES: list[SceneUnderstanding] = [
     SceneUnderstanding(
         dominant_colors=["#2E8B57", "#F4D35E", "#2D9CDB"],
         brightness=0.8,
         tags=["beach", "tropical", "water"],
         detected_objects=[
-            DetectedObject(label="palm_tree", bbox=[0.10, 0.10, 0.30, 0.70], prominence=0.5),
-            DetectedObject(label="rock", bbox=[0.60, 0.60, 0.25, 0.25], prominence=0.2),
+            DetectedObject(label="palm_tree", bbox=[0.10, 0.10, 0.30, 0.70], prominence=0.5, placement="roadside"),
+            DetectedObject(label="rock", bbox=[0.60, 0.60, 0.25, 0.25], prominence=0.2, placement="scattered"),
         ],
     ),
     SceneUnderstanding(
@@ -69,8 +80,8 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.9,
         tags=["snow", "mountain", "cold"],
         detected_objects=[
-            DetectedObject(label="pine_tree", bbox=[0.15, 0.05, 0.25, 0.80], prominence=0.6),
-            DetectedObject(label="rock", bbox=[0.55, 0.65, 0.30, 0.25], prominence=0.3),
+            DetectedObject(label="pine_tree", bbox=[0.15, 0.05, 0.25, 0.80], prominence=0.6, placement="scattered"),
+            DetectedObject(label="rock", bbox=[0.55, 0.65, 0.30, 0.25], prominence=0.3, placement="background"),
         ],
     ),
     SceneUnderstanding(
@@ -78,8 +89,8 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.7,
         tags=["desert", "sand", "dry"],
         detected_objects=[
-            DetectedObject(label="cactus", bbox=[0.40, 0.20, 0.20, 0.60], prominence=0.4),
-            DetectedObject(label="rock", bbox=[0.05, 0.70, 0.25, 0.20], prominence=0.4),
+            DetectedObject(label="cactus", bbox=[0.40, 0.20, 0.20, 0.60], prominence=0.4, placement="scattered"),
+            DetectedObject(label="rock", bbox=[0.05, 0.70, 0.25, 0.20], prominence=0.4, placement="landmark"),
         ],
     ),
     SceneUnderstanding(
@@ -87,8 +98,8 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.5,
         tags=["forest", "grass", "green"],
         detected_objects=[
-            DetectedObject(label="tree", bbox=[0.20, 0.00, 0.35, 0.90], prominence=0.7),
-            DetectedObject(label="bush", bbox=[0.65, 0.60, 0.30, 0.30], prominence=0.3),
+            DetectedObject(label="tree", bbox=[0.20, 0.00, 0.35, 0.90], prominence=0.7, placement="scattered"),
+            DetectedObject(label="bush", bbox=[0.65, 0.60, 0.30, 0.30], prominence=0.3, placement="scattered"),
         ],
     ),
 ]
