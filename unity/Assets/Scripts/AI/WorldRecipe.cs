@@ -42,6 +42,11 @@ namespace MarioKart.AI
     {
         public string type;
         public float density;
+        // How the VLM says this object should be used: "landmark",
+        // "roadside", "background" or "scattered". Optional in the schema;
+        // null/absent (older backends, DefaultWorldRecipe) means "scattered".
+        // See EnvironmentGenerator.ParsePlacement.
+        public string placement;
         public ObjectAsset asset;
     }
 

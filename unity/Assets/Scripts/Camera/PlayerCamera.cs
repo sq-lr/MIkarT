@@ -12,9 +12,9 @@ namespace MarioKart.CameraSystem
         [SerializeField] private Camera cam;
         [SerializeField] private Transform target;
         [Tooltip("Camera position relative to the kart (local space): x right, y up, z back.")]
-        public Vector3 offset = new Vector3(0f, 4f, -5.5f);
+        public Vector3 offset = new Vector3(0f, 3.5f, -3.5f);
         [Tooltip("Point the camera aims at, relative to the kart. Ahead and slightly up keeps the horizon in view.")]
-        public Vector3 lookOffset = new Vector3(0f, 0f, 6f);
+        public Vector3 lookOffset = new Vector3(0f, 0f, 3f);
         public float followLerp = 8f;
 
         private void Awake()

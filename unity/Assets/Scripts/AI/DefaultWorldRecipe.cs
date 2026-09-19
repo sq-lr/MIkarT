@@ -27,8 +27,8 @@ namespace MarioKart.AI
                 track = new TrackInfo { width = 16f, length = 600f, difficulty = 0.4f },
                 objects = new List<WorldObjectEntry>
                 {
-                    new WorldObjectEntry { type = "tree", density = 0.3f },
-                    new WorldObjectEntry { type = "rock", density = 0.15f },
+                    new WorldObjectEntry { type = "tree", density = 0.3f, placement = "scattered" },
+                    new WorldObjectEntry { type = "rock", density = 0.15f, placement = "scattered" },
                 },
                 palette = new List<string> { "#4C6B3A", "#8C8C8C", "#6EC6FF" },
             };

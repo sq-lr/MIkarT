@@ -33,8 +33,9 @@ namespace MarioKart.EditorTools
         private const string MaterialsFolder = "Assets/Materials";
 
         // Must cover the largest default loop (backend mock: 800 m ≈ 127 m
-        // radius) plus walls and environment: a 10 m Unity plane × 40 = 400 m.
-        private const float GroundScale = 40f;
+        // radius) plus EnvironmentGenerator's horizon layer (up to 150 m
+        // beyond the loop): a 10 m Unity plane × 60 = 600 m, ±300 m.
+        private const float GroundScale = 60f;
 
         private static readonly Vector2 Center = new Vector2(0.5f, 0.5f);
 
@@ -255,11 +256,11 @@ namespace MarioKart.EditorTools
             cam.rect = playerIndex == 1 ? new Rect(0f, 0.5f, 1f, 0.5f) : new Rect(0f, 0f, 1f, 0.5f);
             cam.depth = playerIndex;
 
-            // Raised chase cam: well above the kart and a few metres back,
-            // aimed at the road ahead so it looks down at the kart *and* forward.
+            // Tight, high chase cam: close behind and well above the kart,
+            // pitched ~28° down at the road just ahead of it.
             var follow = go.GetComponent<PlayerCamera>();
-            follow.offset = new Vector3(0f, 4f, -5.5f);
-            follow.lookOffset = new Vector3(0f, 0f, 6f);
+            follow.offset = new Vector3(0f, 3.5f, -3.5f);
+            follow.lookOffset = new Vector3(0f, 0f, 3f);
             go.transform.position = target.TransformPoint(follow.offset);
             go.transform.LookAt(target.TransformPoint(follow.lookOffset));
 

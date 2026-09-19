@@ -66,7 +66,7 @@ names, so the builder logs an error naming the field if a script renames one.
 | ↳ `EnvironmentGenerator` | `World/EnvironmentGenerator` **and** `Assets/GeneratedMeshLoader` on the same GameObject (not a child — `Generate()` destroys children) | `meshLoader` → self; `GeneratedMeshLoader.client` → `MeshAssetClient` |
 | ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon and two `TrackBarrier` walls (mesh colliders) | — |
 | ↳ `Checkpoints` | empty; `WorldGenerator` fills it at runtime with trigger gates facing the track tangent | — |
-| ↳ `Ground` | Plane ×40 at y = −0.05 | palette-tinted via `groundRenderer` |
+| ↳ `Ground` | Plane ×60 (600 m) at y = −0.05 | palette-tinted via `groundRenderer` |
 | `Directional Light` | `Light` | palette-tinted via `sunLight` |
 | `RaceManager` | `Racing/RaceManager` | `players` → both `LapManager`s |
 | `RaceBootstrap` | `Racing/RaceBootstrap` — the glue: on `WorldReady` parks the karts on the start line and starts the countdown, on `Racing` unfreezes them, sets split-screen viewports | `worldGenerator`, `raceManager`, `karts[2]`, `cameras[2]` |

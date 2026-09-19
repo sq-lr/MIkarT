@@ -23,6 +23,10 @@ def _stub_client(response):
     return SimpleNamespace(beta=SimpleNamespace(messages=messages)), messages
 
 
+def call_system(messages: StubMessages) -> str:
+    return messages.calls[0]["system"]
+
+
 def test_mock_vision_is_deterministic_and_detects_objects():
     service = MockVisionService()
     a = service.analyze_image(b"same bytes", "x")
@@ -36,7 +40,10 @@ def test_claude_vision_sends_image_and_truncates_to_max_objects():
         dominant_colors=["#111111"],
         brightness=0.4,
         tags=["night"],
-        detected_objects=[DetectedObject(label=f"obj_{i}", bbox=[0.1, 0.1, 0.2, 0.2], prominence=0.5) for i in range(6)],
+        detected_objects=[
+            DetectedObject(label=f"obj_{i}", bbox=[0.1, 0.1, 0.2, 0.2], prominence=0.5, placement="landmark" if i == 0 else "scattered")
+            for i in range(6)
+        ],
     )
     client, messages = _stub_client(SimpleNamespace(stop_reason="end_turn", parsed_output=scene))
     service = ClaudeVisionService(max_objects=2, client=client)
@@ -44,6 +51,8 @@ def test_claude_vision_sends_image_and_truncates_to_max_objects():
     result = service.analyze_image(make_png(), "a spooky night")
 
     assert [o.label for o in result.detected_objects] == ["obj_0", "obj_1"]
+    assert [o.placement for o in result.detected_objects] == ["landmark", "scattered"]
+    assert "placement" in call_system(messages)  # the prompt explains the field
     call = messages.calls[0]
     assert call["model"] == "claude-opus-5"
     assert call["output_format"] is SceneUnderstanding
@@ -58,6 +67,23 @@ def test_claude_vision_refusal_raises():
     service = ClaudeVisionService(max_objects=4, client=client)
     with pytest.raises(RuntimeError):
         service.analyze_image(make_png(), "x")
+
+
+def test_detected_object_placement_defaults_and_is_constrained():
+    assert DetectedObject(label="x", bbox=[0.1, 0.1, 0.2, 0.2], prominence=0.5).placement == "scattered"
+    with pytest.raises(ValueError):
+        DetectedObject(label="x", bbox=[0.1, 0.1, 0.2, 0.2], prominence=0.5, placement="hovering")
+    # Structured output relies on the field being a closed enum in the JSON schema.
+    schema = SceneUnderstanding.model_json_schema()
+    placement_schema = schema["$defs"]["DetectedObject"]["properties"]["placement"]
+    assert set(placement_schema["enum"]) == {"landmark", "roadside", "background", "scattered"}
+
+
+def test_mock_profiles_cover_every_placement():
+    from app.services.vision_service import _MOCK_PROFILES
+
+    seen = {o.placement for profile in _MOCK_PROFILES for o in profile.detected_objects}
+    assert seen == {"landmark", "roadside", "background", "scattered"}
 
 
 def test_detected_object_bbox_validation():

@@ -7,9 +7,11 @@ can replace it later without changing the /generate-world contract.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 
 from app.models.world_recipe import (
+    DEFAULT_PLACEMENT,
     ObjectAsset,
     TrackInfo,
     WorldInfo,
@@ -19,6 +21,8 @@ from app.models.world_recipe import (
 )
 from app.services.mesh_generation_service import MeshTask
 from app.services.vision_service import SceneUnderstanding
+
+logger = logging.getLogger(__name__)
 
 
 class WorldSynthesisService(ABC):
@@ -48,8 +52,8 @@ _THEME_PROFILES: dict[str, dict] = {
         weather="snowy",
         time_of_day="day",
         objects=[
-            WorldObjectEntry(type="pine_tree", density=0.6),
-            WorldObjectEntry(type="rock", density=0.3),
+            WorldObjectEntry(type="pine_tree", density=0.6, placement="scattered"),
+            WorldObjectEntry(type="rock", density=0.3, placement="background"),
         ],
         palette=["#A9C7DE", "#FFFFFF", "#6E7C8C"],
     ),
@@ -60,8 +64,8 @@ _THEME_PROFILES: dict[str, dict] = {
         weather="sunny",
         time_of_day="day",
         objects=[
-            WorldObjectEntry(type="cactus", density=0.4),
-            WorldObjectEntry(type="rock", density=0.4),
+            WorldObjectEntry(type="cactus", density=0.4, placement="scattered"),
+            WorldObjectEntry(type="rock", density=0.4, placement="landmark"),
         ],
         palette=["#E3B778", "#C2B280", "#8A6D3B"],
     ),
@@ -72,8 +76,8 @@ _THEME_PROFILES: dict[str, dict] = {
         weather="cloudy",
         time_of_day="day",
         objects=[
-            WorldObjectEntry(type="tree", density=0.7),
-            WorldObjectEntry(type="rock", density=0.1),
+            WorldObjectEntry(type="tree", density=0.7, placement="scattered"),
+            WorldObjectEntry(type="rock", density=0.1, placement="scattered"),
         ],
         palette=["#2D5A27", "#4C6B3A", "#6E8B3D"],
     ),
@@ -84,8 +88,8 @@ _THEME_PROFILES: dict[str, dict] = {
         weather="sunny",
         time_of_day="day",
         objects=[
-            WorldObjectEntry(type="palm_tree", density=0.5),
-            WorldObjectEntry(type="rock", density=0.2),
+            WorldObjectEntry(type="palm_tree", density=0.5, placement="roadside"),
+            WorldObjectEntry(type="rock", density=0.2, placement="scattered"),
         ],
         palette=["#2E8B57", "#F4D35E", "#2D9CDB"],
     ),
@@ -107,19 +111,37 @@ def _pick_profile_key(scene: SceneUnderstanding, description: str) -> str:
 
 def _objects_from_scene(scene: SceneUnderstanding, mesh_tasks: list[MeshTask]) -> list[WorldObjectEntry]:
     """One recipe object per detected object kind, with its mesh task (if any)
-    attached. Duplicate labels collapse into the first occurrence."""
+    attached and the VLM's placement hint passed through.
+
+    Ordered most-prominent first (stable, so ties keep VLM order) -- purely
+    for readability; Unity keys its behaviour off ``placement``, not order.
+    Duplicate labels collapse into their most prominent occurrence.
+
+    The prompt asks for at most one "landmark"; enforce it here so Unity
+    never has to arbitrate. The most prominent landmark wins, the rest
+    become "scattered"."""
     task_by_type = {task.object_type: task for task in mesh_tasks}
     entries: list[WorldObjectEntry] = []
     seen: set[str] = set()
-    for detected in scene.detected_objects:
+    landmark_taken = False
+    for detected in sorted(scene.detected_objects, key=lambda d: d.prominence, reverse=True):
         if detected.label in seen:
             continue
         seen.add(detected.label)
+
+        placement = detected.placement
+        if placement == "landmark":
+            if landmark_taken:
+                logger.debug("demoting extra landmark %r to %s", detected.label, DEFAULT_PLACEMENT)
+                placement = DEFAULT_PLACEMENT
+            landmark_taken = True
+
         task = task_by_type.get(detected.label)
         entries.append(
             WorldObjectEntry(
                 type=detected.label,
                 density=detected.prominence,
+                placement=placement,
                 asset=ObjectAsset(task_id=task.task_id, provider=task.provider) if task else None,
             )
         )

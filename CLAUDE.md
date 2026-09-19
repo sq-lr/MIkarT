@@ -24,7 +24,8 @@ AI backend (FastAPI, mock by default)
   Meshy Image-to-3D  → one async mesh task per crop
         ↓
 WorldRecipe (versioned JSON contract — schemas/world_recipe.schema.json)
-  objects[].type  = VLM label,  objects[].asset = {task_id} (optional)
+  objects[].type = VLM label, objects[].placement = VLM hint (landmark |
+  roadside | background | scattered), objects[].asset = {task_id} (optional)
         ↓
 Unity (WorldGenerator → TrackGenerator + EnvironmentGenerator)
         ↓

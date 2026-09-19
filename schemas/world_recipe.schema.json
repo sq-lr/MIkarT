@@ -92,6 +92,11 @@
             "minimum": 0.0,
             "maximum": 1.0
           },
+          "placement": {
+            "description": "How Unity should use this object, as judged by the vision model that saw the photo. 'landmark': the visual centrepiece (at most one per recipe) -- placed once or twice, oversized, at key points of the track. 'roadside': lines the road at intervals (lamp posts, fences, bollards). 'background': large distant skyline shapes (mountains, towers). 'scattered': natural clutter in groups (rocks, bushes, trees). Optional; absent means 'scattered'. Added backwards-compatibly (version stays 1).",
+            "type": "string",
+            "enum": ["landmark", "roadside", "background", "scattered"]
+          },
           "asset": {
             "description": "Optional handle to an asynchronously generated 3D mesh for this object type. Unity polls GET /assets/{task_id} and swaps the GLB in over its placeholder when ready. Absent/null when no mesh was requested (mock provider, offline fallback) or the submit failed -- Unity then keeps the primitive placeholder.",
             "type": ["object", "null"],
