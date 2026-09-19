@@ -8,12 +8,12 @@ using UnityEngine;
 namespace MarioKart.AssetsSystem
 {
     /// <summary>
-    /// Swaps backend-generated meshes in over the primitive placeholders that
-    /// EnvironmentGenerator spawned. For every object type that carries a
-    /// mesh task: poll GET /assets/{task_id} until ready (or failed / timed
-    /// out), download the GLB, import it once with glTFast, then place one
-    /// copy at every placeholder of that type and hide the placeholder's
-    /// renderer.
+    /// Swaps backend-generated meshes in over primitive placeholders
+    /// (environment props and track pickups). For every object type that
+    /// carries a mesh task: poll GET /assets/{task_id} until ready (or
+    /// failed / timed out), download the GLB, import it once with glTFast,
+    /// then place one copy at every placeholder of that type and hide the
+    /// placeholder's renderer.
     ///
     /// Placeholder transforms (deterministic from the recipe seed) are never
     /// moved -- the mesh copies just adopt them -- so determinism holds with
@@ -29,6 +29,9 @@ namespace MarioKart.AssetsSystem
 
         private readonly AssetCache cache = new AssetCache();
         private readonly List<GltfImport> imports = new List<GltfImport>();
+        private readonly Dictionary<string, GameObject> templatesByObjectType = new Dictionary<string, GameObject>();
+        private readonly Dictionary<string, List<GameObject>> pendingByType = new Dictionary<string, List<GameObject>>();
+        private readonly HashSet<string> loadingTypes = new HashSet<string>();
         private Transform templateRoot;
 
         /// <summary>
@@ -39,6 +42,9 @@ namespace MarioKart.AssetsSystem
         {
             StopAllCoroutines();
             cache.ClearMeshTemplates();
+            templatesByObjectType.Clear();
+            pendingByType.Clear();
+            loadingTypes.Clear();
             foreach (var import in imports)
             {
                 import.Dispose();
@@ -54,7 +60,9 @@ namespace MarioKart.AssetsSystem
         /// <summary>
         /// Start loading every generated mesh referenced by `definitions`.
         /// `placeholdersByType` maps object type -> the placeholder instances
-        /// spawned for it.
+        /// spawned for it. Safe to call again later (e.g. track obstacles
+        /// after environment) — already-ready templates swap immediately,
+        /// in-flight loads pick up extra placeholders.
         /// </summary>
         public void Begin(IEnumerable<AssetDefinition> definitions, Dictionary<string, List<GameObject>> placeholdersByType)
         {
@@ -69,13 +77,45 @@ namespace MarioKart.AssetsSystem
             foreach (var definition in definitions)
             {
                 if (!definition.HasGeneratedMesh) continue;
-                if (!placeholdersByType.TryGetValue(definition.objectType, out var placeholders) || placeholders.Count == 0) continue;
+                if (placeholdersByType != null &&
+                    placeholdersByType.TryGetValue(definition.objectType, out var placeholders))
+                {
+                    foreach (var placeholder in placeholders)
+                    {
+                        AttachPlaceholder(definition.objectType, placeholder);
+                    }
+                }
 
-                StartCoroutine(LoadAndSwap(definition, placeholders, config));
+                if (templatesByObjectType.ContainsKey(definition.objectType)) continue;
+                if (!loadingTypes.Add(definition.objectType)) continue;
+                StartCoroutine(LoadAndSwap(definition, config));
             }
         }
 
-        private IEnumerator LoadAndSwap(AssetDefinition definition, List<GameObject> placeholders, GameConfig config)
+        /// <summary>
+        /// Swap a generated mesh onto a newly spawned placeholder (used when
+        /// a collected obstacle respawns). No-op until that type's mesh is
+        /// ready; if a load is already in flight the placeholder joins it.
+        /// </summary>
+        public void AttachPlaceholder(string objectType, GameObject placeholder)
+        {
+            if (string.IsNullOrEmpty(objectType) || placeholder == null) return;
+
+            if (templatesByObjectType.TryGetValue(objectType, out var template) && template != null)
+            {
+                PlaceOver(template, placeholder);
+                return;
+            }
+
+            if (!pendingByType.TryGetValue(objectType, out var pending))
+            {
+                pending = new List<GameObject>();
+                pendingByType[objectType] = pending;
+            }
+            pending.Add(placeholder);
+        }
+
+        private IEnumerator LoadAndSwap(AssetDefinition definition, GameConfig config)
         {
             string taskId = definition.meshTaskId;
 
@@ -94,6 +134,7 @@ namespace MarioKart.AssetsSystem
                 if (status != null && status.status == MeshTaskStatus.Failed)
                 {
                     Debug.LogWarning($"GeneratedMeshLoader: mesh for '{definition.objectType}' failed ({status.error}); keeping placeholder");
+                    loadingTypes.Remove(definition.objectType);
                     yield break;
                 }
                 if (error != null)
@@ -105,6 +146,7 @@ namespace MarioKart.AssetsSystem
                 if (Time.realtimeSinceStartup > deadline)
                 {
                     Debug.LogWarning($"GeneratedMeshLoader: timed out waiting for mesh '{definition.objectType}'; keeping placeholder");
+                    loadingTypes.Remove(definition.objectType);
                     yield break;
                 }
 
@@ -123,21 +165,29 @@ namespace MarioKart.AssetsSystem
                 if (glb == null || glb.Length == 0)
                 {
                     Debug.LogWarning($"GeneratedMeshLoader: download failed for '{definition.objectType}' ({downloadError}); keeping placeholder");
+                    loadingTypes.Remove(definition.objectType);
                     yield break;
                 }
 
                 yield return ImportTemplate(taskId, definition.objectType, glb);
                 if (!cache.TryGetMeshTemplate(taskId, out template))
                 {
+                    loadingTypes.Remove(definition.objectType);
                     yield break;
                 }
             }
 
-            // 3. Swap: one copy per placeholder, adopting its transform.
-            foreach (var placeholder in placeholders)
+            // 3. Swap: one copy per pending placeholder, adopting its transform.
+            templatesByObjectType[definition.objectType] = template;
+            loadingTypes.Remove(definition.objectType);
+            if (pendingByType.TryGetValue(definition.objectType, out var placeholders))
             {
-                if (placeholder == null) continue; // world was regenerated meanwhile
-                PlaceOver(template, placeholder);
+                pendingByType.Remove(definition.objectType);
+                foreach (var placeholder in placeholders)
+                {
+                    if (placeholder == null) continue; // world was regenerated meanwhile
+                    PlaceOver(template, placeholder);
+                }
             }
         }
 
@@ -183,21 +233,31 @@ namespace MarioKart.AssetsSystem
 
         private static void PlaceOver(GameObject template, GameObject placeholder)
         {
-            var placeholderRenderer = placeholder.GetComponent<Renderer>();
-            // Match the placeholder's visual height, and rest the mesh's
-            // bottom where the placeholder's bottom is (EnvironmentGenerator
-            // stands placeholders on the ground, with per-instance scale,
-            // tilt and sink -- all of which should carry over to the mesh).
-            float targetHeight = placeholderRenderer != null ? placeholderRenderer.bounds.size.y : placeholder.transform.localScale.y;
+            var placeholderRenderers = placeholder.GetComponentsInChildren<Renderer>();
+            float targetHeight = placeholder.transform.localScale.y;
             Vector3 groundPoint = placeholder.transform.position;
-            if (placeholderRenderer != null) groundPoint.y = placeholderRenderer.bounds.min.y;
+            if (placeholderRenderers.Length > 0)
+            {
+                var placeholderBounds = placeholderRenderers[0].bounds;
+                for (int i = 1; i < placeholderRenderers.Length; i++)
+                {
+                    placeholderBounds.Encapsulate(placeholderRenderers[i].bounds);
+                }
+                if (placeholderBounds.size.y > 0.0001f) targetHeight = placeholderBounds.size.y;
+                groundPoint.y = placeholderBounds.min.y;
+            }
 
             // A mirrored placeholder (negative X scale) mirrors the mesh too.
             bool mirrored = placeholder.transform.localScale.x < 0f;
 
-            // Copies go next to the placeholder, not under it, so the
-            // placeholder's non-uniform scale doesn't distort the mesh.
-            var copy = Instantiate(template, placeholder.transform.parent);
+            // Uniform-scale roots (track pickups) can nest the mesh so it
+            // follows bob/spin. Environment placeholders are often non-uniform,
+            // so those copies stay siblings and avoid distortion.
+            var rootScale = placeholder.transform.localScale;
+            bool nest = Mathf.Abs(rootScale.x - rootScale.y) < 0.001f && Mathf.Abs(rootScale.y - rootScale.z) < 0.001f;
+            Transform parent = nest ? placeholder.transform : placeholder.transform.parent;
+
+            var copy = Instantiate(template, parent);
             copy.name = $"{placeholder.name}_Mesh";
             copy.SetActive(true);
             copy.transform.position = placeholder.transform.position;
@@ -207,16 +267,16 @@ namespace MarioKart.AssetsSystem
             var bounds = CombinedBounds(copy);
             if (bounds.HasValue && bounds.Value.size.y > 0.0001f)
             {
-                float scale = targetHeight / bounds.Value.size.y;
-                copy.transform.localScale = new Vector3(mirrored ? -scale : scale, scale, scale);
+                float fit = targetHeight / bounds.Value.size.y;
+                copy.transform.localScale = new Vector3(mirrored ? -fit : fit, fit, fit);
                 var scaled = CombinedBounds(copy).Value;
                 var groundOffset = groundPoint - new Vector3(scaled.center.x, scaled.min.y, scaled.center.z);
                 copy.transform.position += groundOffset;
             }
 
-            if (placeholderRenderer != null)
+            foreach (var renderer in placeholderRenderers)
             {
-                placeholderRenderer.enabled = false;
+                if (renderer != null) renderer.enabled = false;
             }
         }
 

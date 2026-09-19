@@ -99,6 +99,10 @@ namespace MarioKart.EditorTools
             var checkpoints = new GameObject("Checkpoints");
             checkpoints.transform.SetParent(worldGenerator.transform);
 
+            var obstacles = new GameObject("Obstacles", typeof(ObstacleGenerator));
+            obstacles.transform.SetParent(worldGenerator.transform);
+            var obstacleGenerator = obstacles.GetComponent<ObstacleGenerator>();
+
             var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
             ground.transform.SetParent(worldGenerator.transform);
@@ -139,6 +143,8 @@ namespace MarioKart.EditorTools
             Set(worldGenerator, "environmentGenerator", environmentGenerator);
             Set(worldGenerator, "trackVisualRoot", trackVisual.transform);
             Set(worldGenerator, "checkpointRoot", checkpoints.transform);
+            Set(worldGenerator, "obstacleRoot", obstacles.transform);
+            Set(obstacleGenerator, "meshLoader", meshLoader);
             Set(worldGenerator, "sunLight", sun);
             Set(worldGenerator, "groundRenderer", groundRenderer);
 

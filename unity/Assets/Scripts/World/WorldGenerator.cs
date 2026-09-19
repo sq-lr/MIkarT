@@ -8,7 +8,8 @@ namespace MarioKart.World
 {
     /// <summary>
     /// Orchestrates world generation: derives sub-seeds from
-    /// recipe.seed, builds the track, spawns checkpoints, populates the
+    /// recipe.seed, builds the track, spawns checkpoints, places
+    /// pass-through track obstacles (reshuffled each Generate), populates the
     /// environment, and tints placeholder materials from the palette. This
     /// is the boundary where the WorldRecipe (data) becomes an actual scene
     /// (Unity objects).
@@ -18,6 +19,7 @@ namespace MarioKart.World
         [SerializeField] private EnvironmentGenerator environmentGenerator;
         [SerializeField] private Transform trackVisualRoot;
         [SerializeField] private Transform checkpointRoot;
+        [SerializeField] private Transform obstacleRoot;
         [SerializeField] private Light sunLight;
         [SerializeField] private Renderer groundRenderer;
 
@@ -40,6 +42,10 @@ namespace MarioKart.World
             {
                 environmentGenerator.Generate(recipe, track, envSeed);
             }
+
+            var obstacles = EnsureObstacleGenerator();
+            obstacles.Configure(environmentGenerator != null ? environmentGenerator.MeshLoader : null);
+            obstacles.Generate(track, recipe, recipe.seed);
 
             ApplyPalette(recipe.palette);
 
@@ -90,6 +96,38 @@ namespace MarioKart.World
                 var checkpoint = go.AddComponent<Checkpoint>();
                 checkpoint.checkpointIndex = i;
             }
+        }
+
+        /// <summary>
+        /// Runtime-created if the scene wasn't rebuilt after obstacles were
+        /// added, so an already-wired Main.unity still gets pickups.
+        /// </summary>
+        private ObstacleGenerator EnsureObstacleGenerator()
+        {
+            var root = EnsureObstacleRoot();
+            var generator = root.GetComponent<ObstacleGenerator>();
+            if (generator == null)
+            {
+                generator = root.gameObject.AddComponent<ObstacleGenerator>();
+            }
+            return generator;
+        }
+
+        private Transform EnsureObstacleRoot()
+        {
+            if (obstacleRoot != null) return obstacleRoot;
+
+            var existing = transform.Find("Obstacles");
+            if (existing != null)
+            {
+                obstacleRoot = existing;
+                return obstacleRoot;
+            }
+
+            var go = new GameObject("Obstacles");
+            go.transform.SetParent(transform, worldPositionStays: false);
+            obstacleRoot = go.transform;
+            return obstacleRoot;
         }
 
         /// <summary>

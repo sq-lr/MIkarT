@@ -59,10 +59,12 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   for them — see docs/decisions/0007-text-to-3d-key-assets.md
 ✓ Async mesh delivery: race starts on primitive placeholders, generated
   meshes swap in when ready (placeholders stay if generation fails)
+✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
+  reshuffled on the racing line each world generation
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
-✗ Obstacles, items, weapons, hazards, powerups, boosts
+✗ Items, weapons, hazards, powerups (beyond the pass-through track obstacles)
 ✗ Multiple track templates, branching tracks, jumps
 ✗ Complex procedural terrain
 ✗ Asset retrieval / asset-pack lookup (replaced by mesh generation)
