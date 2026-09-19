@@ -65,3 +65,10 @@ def test_extracted_asset_validates_bounds():
         ExtractedAsset(label="x", prompt="y", density=1.5)
     with pytest.raises(ValueError):
         ExtractedAsset(label="x", prompt="", density=0.5)
+
+
+def test_extracted_asset_placement_defaults_and_validates():
+    assert ExtractedAsset(label="x", prompt="y", density=0.5).placement == "scattered"
+    ExtractedAsset(label="x", prompt="y", density=0.5, placement="landmark")  # doesn't raise
+    with pytest.raises(ValueError):
+        ExtractedAsset(label="x", prompt="y", density=0.5, placement="not_a_real_placement")

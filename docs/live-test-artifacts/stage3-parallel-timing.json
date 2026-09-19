@@ -1,0 +1,22 @@
+{
+  "total_request_seconds": 6.49,
+  "stage_seconds": {
+    "vision.analyze_image": 5.61,
+    "crop_objects": 0.02,
+    "synthesis.synthesize": 0.0
+  },
+  "mesh_submit_per_crop_seconds": {
+    "information_kiosk": 0.69,
+    "wire_mesh_sculpture": 0.69,
+    "concrete_building": 0.76,
+    "bare_tree": 0.85
+  },
+  "mesh_submit_wallclock_max_seconds": 0.85,
+  "mesh_submit_sequential_equivalent_seconds": 2.98,
+  "mesh_ready_seconds": {
+    "information_kiosk": 216.55,
+    "bare_tree": 232.53,
+    "wire_mesh_sculpture": 463.2,
+    "concrete_building": 509.9
+  }
+}

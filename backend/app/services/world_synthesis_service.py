@@ -30,6 +30,13 @@ logger = logging.getLogger(__name__)
 # schemas/world_recipe.schema.json.
 _MAX_RECIPE_OBJECTS = 12
 
+# Keep in sync with the "at most MAX_LANDMARKS objects may be 'landmark'"
+# rule in both app.prompts.object_extraction and
+# app.prompts.text_asset_extraction. Enforced again here because the two
+# extraction calls are independent and each caps itself only within its own
+# output -- combined, they could otherwise produce twice this many.
+MAX_LANDMARKS = 2
+
 
 class WorldSynthesisService(ABC):
     @abstractmethod
@@ -129,13 +136,13 @@ def _objects_from_scene(scene: SceneUnderstanding, mesh_tasks: list[MeshTask]) -
     for readability; Unity keys its behaviour off ``placement``, not order.
     Duplicate labels collapse into their most prominent occurrence.
 
-    The prompt asks for at most one "landmark"; enforce it here so Unity
-    never has to arbitrate. The most prominent landmark wins, the rest
+    The prompt asks for at most MAX_LANDMARKS "landmark"s; enforce it here so
+    Unity never has to arbitrate. The most prominent landmarks win, the rest
     become "scattered"."""
     task_by_type = {task.object_type: task for task in mesh_tasks}
     entries: list[WorldObjectEntry] = []
     seen: set[str] = set()
-    landmark_taken = False
+    landmark_count = 0
     for detected in sorted(scene.detected_objects, key=lambda d: d.prominence, reverse=True):
         if detected.label in seen:
             continue
@@ -143,10 +150,11 @@ def _objects_from_scene(scene: SceneUnderstanding, mesh_tasks: list[MeshTask]) -
 
         placement = detected.placement
         if placement == "landmark":
-            if landmark_taken:
+            if landmark_count >= MAX_LANDMARKS:
                 logger.debug("demoting extra landmark %r to %s", detected.label, DEFAULT_PLACEMENT)
                 placement = DEFAULT_PLACEMENT
-            landmark_taken = True
+            else:
+                landmark_count += 1
 
         task = task_by_type.get(detected.label)
         entries.append(
@@ -164,11 +172,20 @@ def _objects_from_text_assets(
     text_assets: list[ExtractedAsset],
     text_mesh_tasks: list[MeshTask],
     taken_labels: set[str],
+    landmark_count: int,
 ) -> list[WorldObjectEntry]:
     """One entry per extracted asset, skipping any label already claimed by a
     photo-detected object -- photo-derived wins on collision, since the text
     extraction never sees the photo and can't know it's about to duplicate
-    something actually in the player's picture."""
+    something actually in the player's picture.
+
+    `landmark_count` is how many photo-detected objects already claimed
+    "landmark" -- the text extractor's own prompt caps it at MAX_LANDMARKS
+    per call, but that call has no idea what the (independent) vision call
+    decided, so the two combined could exceed it. Demote here, same as
+    `_objects_from_scene` does within its own call, so Unity never sees more
+    than MAX_LANDMARKS "landmark"s total.
+    """
     task_by_label = {task.object_type: task for task in text_mesh_tasks}
     entries: list[WorldObjectEntry] = []
     seen = set(taken_labels)
@@ -177,11 +194,21 @@ def _objects_from_text_assets(
             logger.info("text asset %r collides with a photo-detected object; skipping", asset.label)
             continue
         seen.add(asset.label)
+
+        placement = asset.placement
+        if placement == "landmark":
+            if landmark_count >= MAX_LANDMARKS:
+                logger.debug("demoting text asset landmark %r to %s", asset.label, DEFAULT_PLACEMENT)
+                placement = DEFAULT_PLACEMENT
+            else:
+                landmark_count += 1
+
         task = task_by_label.get(asset.label)
         entries.append(
             WorldObjectEntry(
                 type=asset.label,
                 density=asset.density,
+                placement=placement,
                 asset=ObjectAsset(task_id=task.task_id, provider=task.provider) if task else None,
             )
         )
@@ -206,7 +233,10 @@ class MockWorldSynthesisService(WorldSynthesisService):
 
         photo_objects = _objects_from_scene(scene, mesh_tasks or [])
         text_objects = _objects_from_text_assets(
-            text_assets or [], text_mesh_tasks or [], {o.type for o in photo_objects}
+            text_assets or [],
+            text_mesh_tasks or [],
+            {o.type for o in photo_objects},
+            landmark_count=sum(1 for o in photo_objects if o.placement == "landmark"),
         )
         objects = photo_objects + text_objects
         if not objects:

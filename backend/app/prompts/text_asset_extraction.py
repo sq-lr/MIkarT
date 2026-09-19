@@ -27,11 +27,26 @@ this object's shape, materials, color, and style -- suitable as the ONLY \
 context given to a text-to-3D model generator. Never mention the racing \
 game, camera angles, scene framing, or gameplay behavior -- describe the \
 object itself, as if photographing it in isolation.
-- density: 0.0 to 1.0, how much this object should populate the world (a \
-single large landmark should usually be low, e.g. 0.1-0.2; a small \
-repeatable prop can be higher).
+- density: 0.0 to 1.0, how much this object should populate the world. What \
+it actually controls depends on placement (see below): for "roadside" it sets \
+the spacing between instances (higher = closer together); for "scattered" it \
+sets how many clustered copies appear (higher = more). For "landmark" and \
+"background" the instance count is fixed by the game itself, so a low value \
+such as 0.1-0.2 is fine there.
+- placement: how the game should use this object, exactly one of:
+    "landmark"   -- the visual centrepiece the description is built around \
+(a statue, a fountain, one big distinctive structure). Placed once or twice, \
+oversized, at key points of the track.
+    "roadside"   -- things that would line a path or road at regular \
+intervals (lamp posts, fences, stalls, vending machines, planters).
+    "background" -- large distant things that would form a skyline \
+(towers, monuments, distant structures).
+    "scattered"  -- everything else: casual clutter distributed in groups.
 
 Rules:
+- At most TWO objects may be "landmark". Use it sparingly, only for genuine \
+centrepieces the description calls out; if nothing stands out that way, give \
+no object that placement.
 - Only static decoration: statues, structures, furniture, signage, vehicles- \
 as-scenery, fountains, etc. Never people, animals' faces, text, logos, \
 hazards, items, or gameplay mechanics.

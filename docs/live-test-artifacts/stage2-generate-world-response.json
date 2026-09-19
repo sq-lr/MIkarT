@@ -1,0 +1,41 @@
+{
+    "world_recipe": {
+        "version": 1,
+        "seed": 4140977038,
+        "world": {
+            "name": "Tropical Paradise",
+            "theme": "tropical beach",
+            "terrain": "sand",
+            "weather": "sunny",
+            "time_of_day": "day"
+        },
+        "track": {
+            "width": 8.0,
+            "length": 800.0,
+            "difficulty": 0.5
+        },
+        "objects": [
+            {
+                "type": "wire_mesh_sculpture",
+                "density": 0.55
+            },
+            {
+                "type": "bare_tree",
+                "density": 0.45
+            },
+            {
+                "type": "information_kiosk",
+                "density": 0.3
+            },
+            {
+                "type": "concrete_building",
+                "density": 0.25
+            }
+        ],
+        "palette": [
+            "#2E8B57",
+            "#F4D35E",
+            "#2D9CDB"
+        ]
+    }
+}

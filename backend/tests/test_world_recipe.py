@@ -171,7 +171,7 @@ def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
 
 
-def test_synthesis_passes_placement_through_and_allows_one_landmark():
+def test_synthesis_passes_placement_through_and_allows_two_landmarks():
     service = MockWorldSynthesisService()
     scene = SceneUnderstanding(
         dominant_colors=["#2E8B57"],
@@ -182,6 +182,7 @@ def test_synthesis_passes_placement_through_and_allows_one_landmark():
             DetectedObject(label="lighthouse", bbox=[0.4, 0.0, 0.2, 0.9], prominence=0.6, placement="landmark"),
             DetectedObject(label="mountain", bbox=[0.0, 0.0, 1.0, 0.4], prominence=0.5, placement="background"),
             DetectedObject(label="statue", bbox=[0.7, 0.5, 0.2, 0.4], prominence=0.4, placement="landmark"),  # second landmark
+            DetectedObject(label="flagpole", bbox=[0.6, 0.6, 0.1, 0.3], prominence=0.35, placement="landmark"),  # third landmark
             DetectedObject(label="crate", bbox=[0.8, 0.8, 0.1, 0.1], prominence=0.1),  # no hint -> scattered
         ],
     )
@@ -189,9 +190,10 @@ def test_synthesis_passes_placement_through_and_allows_one_landmark():
     recipe = service.synthesize(scene, "harbour at dusk")
 
     assert {o.type: o.placement for o in recipe.objects} == {
-        "lighthouse": "landmark",  # most prominent landmark wins
+        "lighthouse": "landmark",  # the two most prominent landmarks win
+        "statue": "landmark",
         "mountain": "background",
-        "statue": "scattered",  # demoted: only one landmark per recipe
+        "flagpole": "scattered",  # demoted: at most two landmarks per recipe
         "lamp_post": "roadside",
         "crate": "scattered",
     }
@@ -255,4 +257,61 @@ def test_synthesis_truncates_combined_objects_to_twelve():
     # All 8 photo objects survive; only the first 4 text objects fit.
     assert [o.type for o in recipe.objects[:8]] == [f"photo_{i}" for i in range(8)]
     assert [o.type for o in recipe.objects[8:]] == [f"text_{i}" for i in range(4)]
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_passes_through_text_asset_placement():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+    text_assets = [
+        ExtractedAsset(label="vending_machine", prompt="p", density=0.4, placement="roadside"),
+        ExtractedAsset(label="dragon_statue", prompt="p", density=0.15, placement="landmark"),
+    ]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["vending_machine"] == "roadside"
+    assert placements["dragon_statue"] == "landmark"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_allows_one_photo_and_one_text_landmark():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="lighthouse", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.9, placement="landmark")],
+    )
+    text_assets = [ExtractedAsset(label="dragon_statue", prompt="p", density=0.15, placement="landmark")]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    # Combined total (1 photo + 1 text) is within the cap of two -- both kept.
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["lighthouse"] == "landmark"
+    assert placements["dragon_statue"] == "landmark"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_demotes_text_landmark_when_photo_already_has_two():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[
+            DetectedObject(label="lighthouse", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.9, placement="landmark"),
+            DetectedObject(label="pier", bbox=[0.5, 0.5, 0.3, 0.3], prominence=0.7, placement="landmark"),
+        ],
+    )
+    text_assets = [ExtractedAsset(label="dragon_statue", prompt="p", density=0.15, placement="landmark")]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["lighthouse"] == "landmark"
+    assert placements["pier"] == "landmark"
+    assert placements["dragon_statue"] == "scattered"  # demoted -- the cap of two is already used by the photo
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
