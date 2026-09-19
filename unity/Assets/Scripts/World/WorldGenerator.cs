@@ -121,41 +121,45 @@ namespace MarioKart.World
                 sunLight.color = lightColor;
             }
 
-            private void ApplySky(string sky)
-            {
-                Color background;
-                Color ambient;
-                switch (sky)
-                {
-                    case "cloudy":
-                        background = new Color(0.42f, 0.48f, 0.56f);
-                        ambient = new Color(0.55f, 0.60f, 0.68f);
-                        break;
-                    case "sunset":
-                        background = new Color(0.82f, 0.30f, 0.16f);
-                        ambient = new Color(0.72f, 0.38f, 0.25f);
-                        break;
-                    case "night":
-                        background = new Color(0.03f, 0.05f, 0.14f);
-                        ambient = new Color(0.10f, 0.13f, 0.24f);
-                        break;
-                    default:
-                        background = new Color(0.35f, 0.70f, 0.95f);
-                        ambient = new Color(0.70f, 0.75f, 0.82f);
-                        break;
-                }
-
-                RenderSettings.ambientLight = ambient;
-                foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
-                {
-                    camera.clearFlags = CameraClearFlags.SolidColor;
-                    camera.backgroundColor = background;
-                }
-            }
-
             if (groundRenderer != null && palette.Count > 1 && ColorUtility.TryParseHtmlString(palette[1], out var groundColor))
             {
                 groundRenderer.material.color = groundColor;
+            }
+        }
+
+        /// <summary>
+        /// Sky preset chosen on the upload screen (recipe.world.sky): tints
+        /// ambient light and the cameras' clear colour.
+        /// </summary>
+        private void ApplySky(string sky)
+        {
+            Color background;
+            Color ambient;
+            switch (sky)
+            {
+                case "cloudy":
+                    background = new Color(0.42f, 0.48f, 0.56f);
+                    ambient = new Color(0.55f, 0.60f, 0.68f);
+                    break;
+                case "sunset":
+                    background = new Color(0.82f, 0.30f, 0.16f);
+                    ambient = new Color(0.72f, 0.38f, 0.25f);
+                    break;
+                case "night":
+                    background = new Color(0.03f, 0.05f, 0.14f);
+                    ambient = new Color(0.10f, 0.13f, 0.24f);
+                    break;
+                default:
+                    background = new Color(0.35f, 0.70f, 0.95f);
+                    ambient = new Color(0.70f, 0.75f, 0.82f);
+                    break;
+            }
+
+            RenderSettings.ambientLight = ambient;
+            foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            {
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = background;
             }
         }
     }
