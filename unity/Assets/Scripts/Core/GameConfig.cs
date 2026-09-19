@@ -16,5 +16,11 @@ namespace MarioKart.Core
         public int defaultLapCount = 3;
         public float countdownSeconds = 3f;
         public bool fallbackToDefaultOnError = true;
+
+        // Generated-mesh delivery (see docs/decisions/0006). Meshes arrive
+        // minutes after the race starts; placeholders are used until then.
+        public bool enableGeneratedMeshes = true;
+        public float assetPollIntervalSeconds = 5f;
+        public float assetPollTimeoutSeconds = 600f;
     }
 }

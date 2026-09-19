@@ -19,6 +19,7 @@ namespace MarioKart.Core
 
         [SerializeField] private GameConfig config = new GameConfig();
         [SerializeField] private WorldRecipeClient recipeClient;
+        [SerializeField] private MeshAssetClient meshAssetClient;
         [SerializeField] private WorldGenerator worldGenerator;
         [SerializeField] private RaceManager raceManager;
         [SerializeField] private ResultsUI resultsUI;
@@ -54,6 +55,10 @@ namespace MarioKart.Core
         private void Start()
         {
             recipeClient.Configure(config);
+            if (meshAssetClient != null)
+            {
+                meshAssetClient.Configure(config);
+            }
 
             if (raceManager != null)
             {

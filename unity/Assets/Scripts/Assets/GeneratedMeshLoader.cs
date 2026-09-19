@@ -1,0 +1,229 @@
+using System.Collections;
+using System.Collections.Generic;
+using GLTFast;
+using MarioKart.AI;
+using MarioKart.Core;
+using UnityEngine;
+
+namespace MarioKart.AssetsSystem
+{
+    /// <summary>
+    /// Swaps backend-generated meshes in over the primitive placeholders that
+    /// EnvironmentGenerator spawned. For every object type that carries a
+    /// mesh task: poll GET /assets/{task_id} until ready (or failed / timed
+    /// out), download the GLB, import it once with glTFast, then place one
+    /// copy at every placeholder of that type and hide the placeholder's
+    /// renderer.
+    ///
+    /// Placeholder transforms (deterministic from the recipe seed) are never
+    /// moved -- the mesh copies just adopt them -- so determinism holds with
+    /// or without meshes. The race never waits on this: it starts on
+    /// placeholders and any failure simply leaves them in place.
+    ///
+    /// Lives on the same GameObject as EnvironmentGenerator (or one that
+    /// isn't a child of it, since Generate() destroys its children).
+    /// </summary>
+    public class GeneratedMeshLoader : MonoBehaviour
+    {
+        [SerializeField] private MeshAssetClient client;
+
+        private readonly AssetCache cache = new AssetCache();
+        private readonly List<GltfImport> imports = new List<GltfImport>();
+        private Transform templateRoot;
+
+        /// <summary>
+        /// Cancel in-flight loads and drop imported templates. Called by
+        /// EnvironmentGenerator before it rebuilds the environment.
+        /// </summary>
+        public void Clear()
+        {
+            StopAllCoroutines();
+            cache.ClearMeshTemplates();
+            foreach (var import in imports)
+            {
+                import.Dispose();
+            }
+            imports.Clear();
+            if (templateRoot != null)
+            {
+                Destroy(templateRoot.gameObject);
+                templateRoot = null;
+            }
+        }
+
+        /// <summary>
+        /// Start loading every generated mesh referenced by `definitions`.
+        /// `placeholdersByType` maps object type -> the placeholder instances
+        /// spawned for it.
+        /// </summary>
+        public void Begin(IEnumerable<AssetDefinition> definitions, Dictionary<string, List<GameObject>> placeholdersByType)
+        {
+            if (client == null)
+            {
+                Debug.LogWarning("GeneratedMeshLoader: no MeshAssetClient assigned; keeping placeholders");
+                return;
+            }
+
+            var config = GameManager.Instance != null ? GameManager.Instance.Config : new GameConfig();
+
+            foreach (var definition in definitions)
+            {
+                if (!definition.HasGeneratedMesh) continue;
+                if (!placeholdersByType.TryGetValue(definition.objectType, out var placeholders) || placeholders.Count == 0) continue;
+
+                StartCoroutine(LoadAndSwap(definition, placeholders, config));
+            }
+        }
+
+        private IEnumerator LoadAndSwap(AssetDefinition definition, List<GameObject> placeholders, GameConfig config)
+        {
+            string taskId = definition.meshTaskId;
+
+            // 1. Poll until the backend reports the mesh ready.
+            float deadline = Time.realtimeSinceStartup + config.assetPollTimeoutSeconds;
+            while (true)
+            {
+                MeshTaskStatus status = null;
+                string error = null;
+                bool done = false;
+                client.PollStatus(taskId, s => { status = s; done = true; }, e => { error = e; done = true; });
+                yield return new WaitUntil(() => done);
+
+                if (status != null && status.status == MeshTaskStatus.Ready) break;
+
+                if (status != null && status.status == MeshTaskStatus.Failed)
+                {
+                    Debug.LogWarning($"GeneratedMeshLoader: mesh for '{definition.objectType}' failed ({status.error}); keeping placeholder");
+                    yield break;
+                }
+                if (error != null)
+                {
+                    // Backend unreachable or bad response: keep polling until
+                    // the timeout rather than giving up on the first hiccup.
+                    Debug.Log($"GeneratedMeshLoader: status poll for '{definition.objectType}' errored ({error}); retrying");
+                }
+                if (Time.realtimeSinceStartup > deadline)
+                {
+                    Debug.LogWarning($"GeneratedMeshLoader: timed out waiting for mesh '{definition.objectType}'; keeping placeholder");
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(config.assetPollIntervalSeconds);
+            }
+
+            // 2. Download + import once per task.
+            if (!cache.TryGetMeshTemplate(taskId, out var template))
+            {
+                byte[] glb = null;
+                string downloadError = null;
+                bool downloaded = false;
+                client.DownloadModel(taskId, b => { glb = b; downloaded = true; }, e => { downloadError = e; downloaded = true; });
+                yield return new WaitUntil(() => downloaded);
+
+                if (glb == null || glb.Length == 0)
+                {
+                    Debug.LogWarning($"GeneratedMeshLoader: download failed for '{definition.objectType}' ({downloadError}); keeping placeholder");
+                    yield break;
+                }
+
+                yield return ImportTemplate(taskId, definition.objectType, glb);
+                if (!cache.TryGetMeshTemplate(taskId, out template))
+                {
+                    yield break;
+                }
+            }
+
+            // 3. Swap: one copy per placeholder, adopting its transform.
+            foreach (var placeholder in placeholders)
+            {
+                if (placeholder == null) continue; // world was regenerated meanwhile
+                PlaceOver(template, placeholder);
+            }
+        }
+
+        private IEnumerator ImportTemplate(string taskId, string objectType, byte[] glb)
+        {
+            var import = new GltfImport();
+            var loadTask = import.LoadGltfBinary(glb);
+            yield return new WaitUntil(() => loadTask.IsCompleted);
+
+            if (loadTask.IsFaulted || !loadTask.Result)
+            {
+                Debug.LogWarning($"GeneratedMeshLoader: glTF import failed for '{objectType}'; keeping placeholder");
+                import.Dispose();
+                yield break;
+            }
+
+            if (templateRoot == null)
+            {
+                templateRoot = new GameObject("GeneratedMeshTemplates").transform;
+                templateRoot.SetParent(transform, worldPositionStays: false);
+            }
+
+            var template = new GameObject($"MeshTemplate_{objectType}");
+            template.transform.SetParent(templateRoot, worldPositionStays: false);
+
+            var instantiateTask = import.InstantiateMainSceneAsync(template.transform);
+            yield return new WaitUntil(() => instantiateTask.IsCompleted);
+
+            if (instantiateTask.IsFaulted || !instantiateTask.Result)
+            {
+                Debug.LogWarning($"GeneratedMeshLoader: glTF instantiate failed for '{objectType}'; keeping placeholder");
+                Destroy(template);
+                import.Dispose();
+                yield break;
+            }
+
+            // The import owns the meshes/materials the template references;
+            // keep it alive until Clear().
+            imports.Add(import);
+            template.SetActive(false);
+            cache.StoreMeshTemplate(taskId, template);
+        }
+
+        private static void PlaceOver(GameObject template, GameObject placeholder)
+        {
+            var placeholderRenderer = placeholder.GetComponent<Renderer>();
+            // Match the placeholder's visual height; its position is the ground
+            // point (primitives are centred on it), so rest the mesh's bottom there.
+            float targetHeight = placeholderRenderer != null ? placeholderRenderer.bounds.size.y : placeholder.transform.localScale.y;
+
+            // Copies go next to the placeholder, not under it, so the
+            // placeholder's non-uniform scale doesn't distort the mesh.
+            var copy = Instantiate(template, placeholder.transform.parent);
+            copy.name = $"{placeholder.name}_Mesh";
+            copy.SetActive(true);
+            copy.transform.position = placeholder.transform.position;
+            copy.transform.rotation = placeholder.transform.rotation;
+            copy.transform.localScale = Vector3.one;
+
+            var bounds = CombinedBounds(copy);
+            if (bounds.HasValue && bounds.Value.size.y > 0.0001f)
+            {
+                float scale = targetHeight / bounds.Value.size.y;
+                copy.transform.localScale = Vector3.one * scale;
+                var scaled = CombinedBounds(copy).Value;
+                var groundOffset = placeholder.transform.position - new Vector3(scaled.center.x, scaled.min.y, scaled.center.z);
+                copy.transform.position += groundOffset;
+            }
+
+            if (placeholderRenderer != null)
+            {
+                placeholderRenderer.enabled = false;
+            }
+        }
+
+        private static Bounds? CombinedBounds(GameObject root)
+        {
+            var renderers = root.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return null;
+
+            var bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+            return bounds;
+        }
+    }
+}

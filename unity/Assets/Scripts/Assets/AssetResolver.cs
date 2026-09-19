@@ -1,26 +1,27 @@
 using System.Collections.Generic;
+using MarioKart.AI;
 using UnityEngine;
 
 namespace MarioKart.AssetsSystem
 {
     /// <summary>
-    /// Resolves a recipe object type ("palm_tree", "rock", ...) into an
-    /// AssetDefinition. Not coupled to any external asset provider -- today
-    /// it returns local primitive placeholders. A future
-    /// ExternalAssetResolver can implement this same interface to fetch real
-    /// 3D assets without EnvironmentGenerator changing at all.
+    /// Resolves a recipe object entry into an AssetDefinition: the primitive
+    /// placeholder to spawn immediately, plus (if the backend is generating
+    /// one) the mesh task whose GLB will replace it. Object types are
+    /// whatever labels the vision model extracted from the photo, so unknown
+    /// types are expected and get a neutral placeholder, not a warning.
     /// </summary>
     public interface IAssetResolver
     {
-        AssetDefinition Resolve(string objectType);
+        AssetDefinition Resolve(WorldObjectEntry entry);
     }
 
     public class AssetResolver : IAssetResolver
     {
         private readonly AssetCache cache = new AssetCache();
 
-        // Hardcoded placeholder registry. Extend as new object types appear
-        // in the WorldRecipe schema's vocabulary.
+        // Tuned placeholders for common labels. Anything else falls through
+        // to the keyword heuristic below.
         private static readonly Dictionary<string, AssetDefinition> KnownTypes = new()
         {
             ["palm_tree"] = new AssetDefinition { objectType = "palm_tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.18f, 0.55f, 0.34f), defaultScale = new Vector3(0.5f, 2f, 0.5f) },
@@ -31,21 +32,54 @@ namespace MarioKart.AssetsSystem
             ["bush"] = new AssetDefinition { objectType = "bush", fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.25f, 0.45f, 0.2f), defaultScale = new Vector3(0.8f, 0.6f, 0.8f) },
         };
 
-        public AssetDefinition Resolve(string objectType)
+        public AssetDefinition Resolve(WorldObjectEntry entry)
         {
-            if (cache.TryGet(objectType, out var cached))
+            string objectType = entry.type;
+            string taskId = entry.asset?.task_id;
+
+            if (cache.TryGet(objectType, out var cached) && cached.meshTaskId == taskId)
             {
                 return cached;
             }
 
-            if (!KnownTypes.TryGetValue(objectType, out var definition))
-            {
-                Debug.LogWarning($"AssetResolver: unknown object type '{objectType}', using generic placeholder");
-                definition = new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cube, tintColor = Color.gray };
-            }
+            var definition = KnownTypes.TryGetValue(objectType, out var known)
+                ? Clone(known)
+                : HeuristicPlaceholder(objectType);
+            definition.meshTaskId = taskId;
 
             cache.Store(objectType, definition);
             return definition;
+        }
+
+        // Rough silhouette from the label so an unseen VLM label ("lantern",
+        // "totem_pole", "boulder") still gets a plausible stand-in until its
+        // generated mesh arrives.
+        private static AssetDefinition HeuristicPlaceholder(string objectType)
+        {
+            string label = objectType.ToLowerInvariant();
+
+            if (label.Contains("tree") || label.Contains("pole") || label.Contains("post") || label.Contains("lamp") || label.Contains("column"))
+            {
+                return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.45f, 0.4f, 0.35f), defaultScale = new Vector3(0.4f, 2f, 0.4f) };
+            }
+            if (label.Contains("rock") || label.Contains("boulder") || label.Contains("stone") || label.Contains("bush") || label.Contains("shrub"))
+            {
+                return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Sphere, tintColor = Color.gray, defaultScale = new Vector3(1f, 0.7f, 1f) };
+            }
+
+            return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cube, tintColor = new Color(0.6f, 0.6f, 0.6f), defaultScale = Vector3.one };
+        }
+
+        private static AssetDefinition Clone(AssetDefinition source)
+        {
+            return new AssetDefinition
+            {
+                objectType = source.objectType,
+                prefab = source.prefab,
+                fallbackPrimitive = source.fallbackPrimitive,
+                tintColor = source.tintColor,
+                defaultScale = source.defaultScale,
+            };
         }
     }
 }

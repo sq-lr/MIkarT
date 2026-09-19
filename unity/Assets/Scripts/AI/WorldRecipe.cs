@@ -25,11 +25,24 @@ namespace MarioKart.AI
         public float difficulty;
     }
 
+    /// <summary>
+    /// Handle to a mesh the backend is generating asynchronously for one
+    /// object type. Null when no mesh was requested (mock provider, offline
+    /// DefaultWorldRecipe) -- the object then keeps its primitive placeholder.
+    /// </summary>
+    [Serializable]
+    public class ObjectAsset
+    {
+        public string task_id;
+        public string provider;
+    }
+
     [Serializable]
     public class WorldObjectEntry
     {
         public string type;
         public float density;
+        public ObjectAsset asset;
     }
 
     [Serializable]

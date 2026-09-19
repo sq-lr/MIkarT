@@ -6,9 +6,12 @@ Guidance for anyone (human or AI) working in this repository.
 
 A local, same-keyboard 2-player split-screen kart racing game with an
 AI-generated environment. A user supplies **one image and one text
-description**; a backend turns that into a structured `WorldRecipe`; Unity
-uses the recipe to build a themed environment around one simple loop track.
-Both players then race on that shared world.
+description**; a backend turns that into a structured `WorldRecipe`, and
+turns the important objects in the photo into 3D meshes (a VLM finds and
+crops them, Meshy generates a model from each crop); Unity uses the recipe
+to build a themed environment around one simple loop track and swaps the
+generated meshes in as they finish. Both players then race on that shared
+world.
 
 ## Core flow
 
@@ -16,13 +19,19 @@ Both players then race on that shared world.
 One Image + One Text Description
         ↓
 AI backend (FastAPI, mock by default)
+  VLM (Claude vision) → scene info + object bounding boxes
+  ObjectCropper      → one image crop per object
+  Meshy Image-to-3D  → one async mesh task per crop
         ↓
 WorldRecipe (versioned JSON contract — schemas/world_recipe.schema.json)
+  objects[].type  = VLM label,  objects[].asset = {task_id} (optional)
         ↓
 Unity (WorldGenerator → TrackGenerator + EnvironmentGenerator)
         ↓
-Generated Loop Track + Environment
-        ↓
+Generated Loop Track + primitive placeholder environment   ── race starts
+        ↓                                                          │
+GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
+        ↓                                                          ▼
 2 Player Split-Screen Race (P1: WASD, P2: Arrow keys)
 ```
 
@@ -39,14 +48,20 @@ Generated Loop Track + Environment
 ✓ Basic laps/checkpoints/winner determination
 ✓ Deterministic generation from a seed
 ✓ Offline fallback (DefaultWorldRecipe) if the backend call fails
+✓ VLM object extraction (Claude vision) + Meshy image-to-3D meshes for the
+  objects in the photo, behind interfaces; mock providers are the default
+✓ Async mesh delivery: race starts on primitive placeholders, generated
+  meshes swap in when ready (placeholders stay if generation fails)
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
 ✗ Obstacles, items, weapons, hazards, powerups, boosts
 ✗ Multiple track templates, branching tracks, jumps
 ✗ Complex procedural terrain
-✗ Advanced asset ranking / external asset API integration
-✗ Real AI vendor integration (mock only, swappable behind an interface)
+✗ Asset retrieval / asset-pack lookup (replaced by mesh generation)
+✗ Real LLM-based world synthesis (theme/palette/track are still a
+  deterministic mock; only vision + mesh generation are real vendors)
+✗ Persisting generated meshes across backend restarts
 ✗ Polished UI, final VFX, production auth, cloud deployment
 ✗ Webcam capture or drag-and-drop image upload (file-picker only, Editor-only for now — see docs/decisions/0003-image-picker-stub.md)
 ```
@@ -55,9 +70,9 @@ Generated Loop Track + Environment
 
 | Owner | Directories |
 |---|---|
-| Person A — AI / backend / WorldRecipe | `backend/**`, `schemas/**`, `unity/Assets/Scripts/AI/**` |
+| Person A — AI / backend / WorldRecipe | `backend/**` (vision, cropper, Meshy client, `/generate-world`, `/assets`), `schemas/**`, `unity/Assets/Scripts/AI/**` (incl. `MeshAssetClient.cs`) |
 | Person B — Unity gameplay / track / racing | `unity/Assets/Scripts/Core/**`, `Players/**`, `Racing/**`, `World/TrackGenerator.cs`, `World/WorldGenerator.cs` |
-| Person C — assets / asset resolver / environment | `unity/Assets/Scripts/Assets/**` (namespace `MarioKart.AssetsSystem`), `World/EnvironmentGenerator.cs` |
+| Person C — assets / generated meshes / environment | `unity/Assets/Scripts/Assets/**` (namespace `MarioKart.AssetsSystem`, incl. `GeneratedMeshLoader.cs`), `World/EnvironmentGenerator.cs` |
 | Person D — UI / upload flow / QA | `unity/Assets/Scripts/UI/**`, `Input/**`, manual playtesting |
 
 Changes to `schemas/world_recipe.schema.json` affect every module and need
@@ -66,23 +81,30 @@ at minimum) — see `docs/development.md`'s conventions section.
 
 ## Architecture rules
 
-1. **AI generates structured data. Unity generates the game.** The AI backend
-   never touches a Unity object; Unity never calls an AI model directly.
-2. **`WorldRecipe` is the backend/frontend contract.** It is the only thing
+1. **AI generates structured data (and meshes). Unity generates the game.**
+   The AI backend never touches a Unity object; Unity never calls an AI
+   model or the mesh provider directly — generated GLBs are proxied through
+   the backend.
+2. **`WorldRecipe` is the backend/frontend contract.** It (plus the mesh
+   bytes its `objects[].asset.task_id` handles point at) is the only thing
    that crosses that boundary — see `schemas/world_recipe.schema.json` and
    `docs/world-recipe.md`. Both `backend/app/models/world_recipe.py` and
    `unity/Assets/Scripts/AI/WorldRecipe.cs` must stay in sync with it.
 3. **Generation is deterministic from the recipe's seed.** Every procedural
    system derives its randomness via `WorldRandom.DeriveSeed`, never
    `UnityEngine.Random`'s global state — see `docs/decisions/0004-seed-derivation.md`.
-4. **Do not add networking** beyond the single `POST /generate-world` call.
-   This is a local, same-keyboard game.
+4. **Unity only talks to the backend API** — `POST /generate-world`, then
+   `GET /assets/{task_id}` / `GET /assets/{task_id}/model.glb` for generated
+   meshes (see `docs/decisions/0006-meshy-async-mesh-generation.md`). No
+   other networking: this is a local, same-keyboard game.
 5. **Do not add gameplay features outside the current scope** (items,
    obstacles, multiple tracks, etc.) without team agreement — update this
    file's scope checklist when scope changes.
 6. **The game must survive AI failure.** Any backend error or timeout falls
    back to `DefaultWorldRecipe` in Unity so the game stays fully playable
-   offline.
+   offline. The race never waits on mesh generation: it starts on primitive
+   placeholders, and if a mesh fails, times out, or the provider is mocked,
+   the placeholder simply stays.
 
 ## Repository structure
 
@@ -103,3 +125,8 @@ see `docs/development.md`), and ADRs under `docs/decisions/`.
   Editor before relying on it.
 - Real image picking (native file dialog) only works inside the Unity
   Editor; standalone builds use a bundled placeholder image.
+- The mesh task registry is in-memory: restarting the backend orphans any
+  in-flight `task_id`s (Unity gets 404s and keeps placeholders).
+- `GeneratedMeshLoader` / glTFast import has not been run in the Editor
+  either; the Meshy and Claude clients have only been exercised against
+  scripted fakes in `backend/tests/`.

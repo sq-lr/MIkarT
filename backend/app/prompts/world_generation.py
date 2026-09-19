@@ -24,10 +24,12 @@ def build_user_prompt(description: str, scene: SceneUnderstanding) -> str:
     `scene` is the app.services.vision_service.SceneUnderstanding produced by
     VisionService.analyze_image for the uploaded photo.
     """
+    detected = ", ".join(f"{o.label} (prominence {o.prominence:.2f})" for o in scene.detected_objects) or "none"
     return (
         f"User description: {description!r}\n"
         f"Detected scene tags: {scene.tags}\n"
         f"Dominant colors: {scene.dominant_colors}\n"
         f"Brightness: {scene.brightness}\n"
+        f"Objects extracted from the photo (use these as objects[].type): {detected}\n"
         "Produce a single WorldRecipe JSON object matching the schema."
     )

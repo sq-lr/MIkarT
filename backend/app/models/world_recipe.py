@@ -17,6 +17,7 @@ _HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
+_ASSET_PROVIDER_VALUES = {"meshy"}
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -73,9 +74,30 @@ class TrackInfo(BaseModel):
         return _clamp(v, 0.0, 1.0)
 
 
+class ObjectAsset(BaseModel):
+    """Handle to an asynchronously generated 3D mesh for one object type.
+
+    Unity polls GET /assets/{task_id} and downloads the GLB once it is ready;
+    until then (or if generation fails) it keeps the primitive placeholder.
+    """
+
+    task_id: str = Field(min_length=1, max_length=128)
+    provider: str
+
+    @field_validator("provider")
+    @classmethod
+    def _valid_provider(cls, v: str) -> str:
+        if v not in _ASSET_PROVIDER_VALUES:
+            raise ValueError(f"provider must be one of {sorted(_ASSET_PROVIDER_VALUES)}")
+        return v
+
+
 class WorldObjectEntry(BaseModel):
     type: str = Field(min_length=1, max_length=40)
     density: float
+    # Optional: absent when no mesh was generated for this type (mock mesh
+    # provider, Meshy submit failure, or the offline DefaultWorldRecipe).
+    asset: ObjectAsset | None = None
 
     @field_validator("density")
     @classmethod

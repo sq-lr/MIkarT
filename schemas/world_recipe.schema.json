@@ -73,7 +73,7 @@
       }
     },
     "objects": {
-      "description": "Environment decoration types and their relative density. Bootstrap scope: decoration only, never obstacles/hazards.",
+      "description": "Environment decoration types and their relative density. `type` is the label the vision model gave the object it extracted from the source image (snake_case, e.g. 'palm_tree'); it is not a fixed vocabulary. Bootstrap scope: decoration only, never obstacles/hazards.",
       "type": "array",
       "minItems": 0,
       "maxItems": 12,
@@ -91,6 +91,23 @@
             "type": "number",
             "minimum": 0.0,
             "maximum": 1.0
+          },
+          "asset": {
+            "description": "Optional handle to an asynchronously generated 3D mesh for this object type. Unity polls GET /assets/{task_id} and swaps the GLB in over its placeholder when ready. Absent/null when no mesh was requested (mock provider, offline fallback) or the submit failed -- Unity then keeps the primitive placeholder.",
+            "type": ["object", "null"],
+            "required": ["task_id", "provider"],
+            "additionalProperties": false,
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "provider": {
+                "type": "string",
+                "enum": ["meshy"]
+              }
+            }
           }
         }
       }
