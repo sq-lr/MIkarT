@@ -44,6 +44,12 @@
         "time_of_day": {
           "type": "string",
           "enum": ["day", "night", "dusk", "dawn"]
+        },
+        "sky": {
+          "description": "Selected race-sky presentation from the upload screen.",
+          "type": "string",
+          "enum": ["sunny", "cloudy", "sunset", "night"],
+          "default": "sunny"
         }
       }
     },

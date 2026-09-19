@@ -17,6 +17,7 @@ _HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
+_SKY_VALUES = {"sunny", "cloudy", "sunset", "night"}
 _ASSET_PROVIDER_VALUES = {"meshy"}
 # How Unity should use an object, as judged by the vision model. Mirrors the
 # enum in the schema and DetectedObject.placement in vision_service.py.
@@ -44,6 +45,7 @@ class WorldInfo(BaseModel):
     terrain: str
     weather: str
     time_of_day: str
+    sky: str = "sunny"
 
     @field_validator("terrain")
     @classmethod
@@ -64,6 +66,13 @@ class WorldInfo(BaseModel):
     def _valid_time_of_day(cls, v: str) -> str:
         if v not in _TIME_OF_DAY_VALUES:
             raise ValueError(f"time_of_day must be one of {sorted(_TIME_OF_DAY_VALUES)}")
+        return v
+
+    @field_validator("sky")
+    @classmethod
+    def _valid_sky(cls, v: str) -> str:
+        if v not in _SKY_VALUES:
+            raise ValueError(f"sky must be one of {sorted(_SKY_VALUES)}")
         return v
 
 

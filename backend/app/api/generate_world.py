@@ -22,6 +22,7 @@ _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 async def generate_world(
     image: UploadFile = File(...),
     description: str = Form(..., min_length=1, max_length=500),
+    sky: str = Form("sunny"),
 ) -> WorldRecipeResponse:
     if image.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="image must be image/jpeg or image/png")
@@ -60,7 +61,14 @@ async def generate_world(
             providers.registry.add(task)
 
         # 4. Assemble the recipe; objects carry their task handles.
-        recipe = providers.synthesis.synthesize(scene, description, image_mesh_tasks, key_assets, text_mesh_tasks)
+        recipe = providers.synthesis.synthesize(
+            scene,
+            description,
+            image_mesh_tasks,
+            key_assets,
+            text_mesh_tasks,
+            sky=sky,
+        )
     except Exception:
         logger.exception("world generation failed")
         raise HTTPException(status_code=500, detail="world generation failed")

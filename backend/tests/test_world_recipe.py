@@ -27,6 +27,7 @@ VALID_RECIPE = {
         "terrain": "sand",
         "weather": "sunny",
         "time_of_day": "day",
+        "sky": "sunny",
     },
     "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5},
     "objects": [
@@ -145,6 +146,15 @@ def test_synthesis_is_deterministic():
     assert recipe_a.model_dump() == recipe_b.model_dump()
     # No detections -> the theme profile's canned objects are used.
     assert [o.type for o in recipe_a.objects] == ["palm_tree", "rock"]
+
+
+def test_synthesis_preserves_selected_sky():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+
+    recipe = service.synthesize(scene, "make it a beach paradise", sky="sunset")
+
+    assert recipe.world.sky == "sunset"
 
 
 def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
