@@ -29,7 +29,7 @@ VALID_RECIPE = {
         "time_of_day": "day",
         "sky": "sunny",
     },
-    "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5},
+    "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5, "surface": "concrete"},
     "objects": [
         {"type": "palm_tree", "density": 0.5, "placement": "roadside", "asset": {"task_id": "0193a0c1-abcd", "provider": "meshy"}},
         {"type": "rock", "density": 0.2},
@@ -179,6 +179,28 @@ def test_synthesis_preserves_selected_sky():
     recipe = service.synthesize(scene, "make it a beach paradise", sky="sunset")
 
     assert recipe.world.sky == "sunset"
+
+
+def test_synthesis_selects_track_surface_from_scene():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#C2B280"],
+        brightness=0.7,
+        tags=["desert"],
+        track_surface="dirt",
+    )
+
+    recipe = service.synthesize(scene, "desert race")
+
+    assert recipe.track.surface == "dirt"
+
+
+def test_track_surface_values_are_validated():
+    data = json.loads(json.dumps(VALID_RECIPE))
+    data["track"]["surface"] = "water"
+
+    with pytest.raises(ValidationError):
+        WorldRecipe.model_validate(data)
 
 
 def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():

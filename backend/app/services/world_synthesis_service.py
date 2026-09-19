@@ -99,7 +99,7 @@ _THEME_PROFILES: dict[str, dict] = {
             WorldObjectEntry(type="tree", density=0.7, placement="scattered"),
             WorldObjectEntry(type="rock", density=0.1, placement="scattered"),
         ],
-        palette=["#2D5A27", "#4C6B3A", "#6E8B3D"],
+        palette=["#0B3B32", "#2E7D5B", "#91C83E"],
     ),
     "tropical": dict(
         name="Tropical Paradise",
@@ -258,7 +258,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
                 time_of_day=profile["time_of_day"],
                 sky=sky,
             ),
-            track=TrackInfo(width=16.0, length=800.0, difficulty=0.5),
+            track=TrackInfo(width=16.0, length=800.0, difficulty=0.5, surface=scene.track_surface),
             objects=objects,
             palette=list(profile["palette"]),
         )

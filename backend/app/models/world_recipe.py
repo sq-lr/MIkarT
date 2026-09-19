@@ -18,6 +18,7 @@ _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
 _SKY_VALUES = {"sunny", "cloudy", "sunset", "night"}
+_TRACK_SURFACE_VALUES = {"concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"}
 _ASSET_PROVIDER_VALUES = {"meshy"}
 # How Unity should use an object, as judged by the vision model. Mirrors the
 # enum in the schema and DetectedObject.placement in vision_service.py.
@@ -87,11 +88,19 @@ class TrackInfo(BaseModel):
     width: float = Field(gt=0)
     length: float = Field(gt=0)
     difficulty: float
+    surface: str = "concrete"
 
     @field_validator("difficulty")
     @classmethod
     def _clamp_difficulty(cls, v: float) -> float:
         return _clamp(v, 0.0, 1.0)
+
+    @field_validator("surface")
+    @classmethod
+    def _valid_surface(cls, v: str) -> str:
+        if v not in _TRACK_SURFACE_VALUES:
+            raise ValueError(f"surface must be one of {sorted(_TRACK_SURFACE_VALUES)}")
+        return v
 
 
 class ObjectAsset(BaseModel):

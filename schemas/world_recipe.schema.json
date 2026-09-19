@@ -76,6 +76,12 @@
           "type": "number",
           "minimum": 0.0,
           "maximum": 1.0
+        },
+        "surface": {
+          "description": "Race-road surface selected from the uploaded image.",
+          "type": "string",
+          "enum": ["concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"],
+          "default": "concrete"
         }
       }
     },

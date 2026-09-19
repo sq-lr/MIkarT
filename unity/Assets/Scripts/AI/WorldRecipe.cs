@@ -24,6 +24,7 @@ namespace MarioKart.AI
         public float width;
         public float length;
         public float difficulty;
+        public string surface = "concrete";
     }
 
     /// <summary>

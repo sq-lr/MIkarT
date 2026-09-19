@@ -57,6 +57,20 @@ namespace MarioKart.World
             BuildFinishLine(root, centers[0], finishForward, rights[0], halfWidth);
         }
 
+        public static Color SurfaceColor(string surface)
+        {
+            switch (surface)
+            {
+                // Forest-reference palette: terracotta, slate, moss and
+                // deep earth sit against the image's dark teal canopy.
+                case "red_bricks": return new Color(0.57f, 0.20f, 0.14f);
+                case "grey_tiles": return new Color(0.28f, 0.38f, 0.38f);
+                case "stone_slabs": return new Color(0.32f, 0.42f, 0.34f);
+                case "dirt": return new Color(0.29f, 0.18f, 0.11f);
+                default: return new Color(0.19f, 0.29f, 0.28f);
+            }
+        }
+
         // ------------------------------------------------------------------
 
         private static void BuildFinishLine(Transform root, Vector3 center, Vector3 forward, Vector3 right, float halfWidth)

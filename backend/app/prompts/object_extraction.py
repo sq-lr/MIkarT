@@ -17,6 +17,11 @@ Produce a SceneUnderstanding with:
 - brightness: overall brightness from 0.0 (very dark) to 1.0 (very bright).
 - tags: 3 to 8 lowercase single-word scene tags (e.g. "beach", "snow", "forest", \
 "desert", "night", "urban").
+- track_surface: choose the most appropriate race-road surface for the image, \
+exactly one of "concrete", "red_bricks", "grey_tiles", "stone_slabs", or "dirt". \
+Use concrete for modern paved roads, red_bricks for brick streets, grey_tiles for \
+regular tile paving, stone_slabs for irregular stone paths, and dirt for unpaved \
+trails or natural ground.
 - detected_objects: up to {max_objects} distinct, physically separable objects that \
 would make good trackside 3D decoration props, ordered from most to least visually \
 important. For each object give:
