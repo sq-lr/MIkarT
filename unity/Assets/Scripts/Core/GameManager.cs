@@ -57,6 +57,15 @@ namespace MarioKart.Core
             Instance = this;
         }
 
+        // A script recompile during Play mode wipes statics and re-runs
+        // OnEnable (not Awake) on every object. Restore Instance here so the
+        // UI panels' OnEnable -- which runs after ours, see the execution
+        // order above -- never sees null after a hot reload.
+        private void OnEnable()
+        {
+            if (Instance == null) Instance = this;
+        }
+
         private void Start()
         {
             recipeClient.Configure(config);

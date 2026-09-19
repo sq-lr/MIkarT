@@ -48,7 +48,7 @@ change.
     "time_of_day": "day"
   },
   "track": {
-    "width": 8.0,
+    "width": 16.0,
     "length": 800.0,
     "difficulty": 0.5
   },

@@ -154,7 +154,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
                 weather=profile["weather"],
                 time_of_day=profile["time_of_day"],
             ),
-            track=TrackInfo(width=8.0, length=800.0, difficulty=0.5),
+            track=TrackInfo(width=16.0, length=800.0, difficulty=0.5),
             objects=objects,
             palette=list(profile["palette"]),
         )

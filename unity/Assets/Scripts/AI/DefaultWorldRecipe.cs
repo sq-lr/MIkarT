@@ -24,7 +24,7 @@ namespace MarioKart.AI
                     weather = "clear",
                     time_of_day = "day",
                 },
-                track = new TrackInfo { width = 8f, length = 600f, difficulty = 0.4f },
+                track = new TrackInfo { width = 16f, length = 600f, difficulty = 0.4f },
                 objects = new List<WorldObjectEntry>
                 {
                     new WorldObjectEntry { type = "tree", density = 0.3f },

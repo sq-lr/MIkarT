@@ -33,7 +33,7 @@ namespace MarioKart.World
             var track = new TrackGenerator().Generate(recipe, trackSeed);
             CurrentTrack = track;
 
-            BuildTrackVisual(track);
+            BuildTrackVisual(track, recipe.palette);
             BuildCheckpoints(track);
 
             if (environmentGenerator != null)
@@ -46,18 +46,22 @@ namespace MarioKart.World
             OnWorldReady?.Invoke();
         }
 
-        private void BuildTrackVisual(GeneratedTrack track)
+        /// <summary>
+        /// Road ribbon + barrier walls (see TrackMeshBuilder). Walls are
+        /// tinted from palette[2] when present so they pick up the theme.
+        /// </summary>
+        private void BuildTrackVisual(GeneratedTrack track, List<string> palette)
         {
             if (trackVisualRoot == null) return;
 
-            var line = trackVisualRoot.GetComponent<LineRenderer>();
-            if (line == null) line = trackVisualRoot.gameObject.AddComponent<LineRenderer>();
+            var roadColor = new Color(0.22f, 0.22f, 0.24f);
+            var wallColor = new Color(0.9f, 0.9f, 0.9f);
+            if (palette != null && palette.Count > 2 && ColorUtility.TryParseHtmlString(palette[2], out var tint))
+            {
+                wallColor = Color.Lerp(wallColor, tint, 0.5f);
+            }
 
-            var points = new List<Vector3>(track.controlPoints) { track.controlPoints[0] };
-            line.positionCount = points.Count;
-            line.SetPositions(points.ToArray());
-            line.loop = true;
-            line.widthMultiplier = track.width;
+            TrackMeshBuilder.Build(trackVisualRoot, track, roadColor, wallColor);
         }
 
         private void BuildCheckpoints(GeneratedTrack track)

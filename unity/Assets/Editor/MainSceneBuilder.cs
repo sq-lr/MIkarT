@@ -32,9 +32,9 @@ namespace MarioKart.EditorTools
         private const string ScenePath = "Assets/Scenes/Main.unity";
         private const string MaterialsFolder = "Assets/Materials";
 
-        // Must match TrackGenerator's default (600 m loop ≈ 95 m radius):
-        // a 10 m Unity plane × 30 comfortably covers it plus the environment.
-        private const float GroundScale = 30f;
+        // Must cover the largest default loop (backend mock: 800 m ≈ 127 m
+        // radius) plus walls and environment: a 10 m Unity plane × 40 = 400 m.
+        private const float GroundScale = 40f;
 
         private static readonly Vector2 Center = new Vector2(0.5f, 0.5f);
 
@@ -91,18 +91,9 @@ namespace MarioKart.EditorTools
             var environmentGenerator = envGo.GetComponent<EnvironmentGenerator>();
             var meshLoader = envGo.GetComponent<GeneratedMeshLoader>();
 
-            var trackVisual = new GameObject("TrackVisual", typeof(LineRenderer));
+            // TrackMeshBuilder fills this with the road + barrier meshes at runtime.
+            var trackVisual = new GameObject("TrackVisual");
             trackVisual.transform.SetParent(worldGenerator.transform);
-            // Lay the line flat on the ground: TransformZ alignment faces the
-            // transform's Z axis, so point Z up. Positions are world-space.
-            trackVisual.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            var line = trackVisual.GetComponent<LineRenderer>();
-            line.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Line.mat");
-            line.useWorldSpace = true;
-            line.alignment = LineAlignment.TransformZ;
-            line.numCornerVertices = 4;
-            line.positionCount = 0;
-            line.startColor = line.endColor = new Color(0.25f, 0.25f, 0.25f);
 
             var checkpoints = new GameObject("Checkpoints");
             checkpoints.transform.SetParent(worldGenerator.transform);
@@ -290,12 +281,12 @@ namespace MarioKart.EditorTools
 
         private static LobbyUI BuildLobbyPanel(Canvas canvas, Font font)
         {
-            var panel = CreatePanel(canvas.transform, "LobbyPanel", dim: true);
+            var panel = CreatePanel(canvas.transform, "LobbyUI", dim: true, out var holder);
             CreateText(panel.transform, "Title", "MARIO KART: AI WORLDS", font, 64, Center, new Vector2(0f, 120f), new Vector2(1200f, 100f), TextAnchor.MiddleCenter);
             CreateText(panel.transform, "Hint", "P1: WASD    P2: Arrow keys", font, 28, Center, new Vector2(0f, 40f), new Vector2(800f, 40f), TextAnchor.MiddleCenter);
             var start = CreateButton(panel.transform, "StartButton", "Start", font, new Vector2(0f, -60f), new Vector2(320f, 80f));
 
-            var ui = panel.AddComponent<LobbyUI>();
+            var ui = holder.AddComponent<LobbyUI>();
             Set(ui, "panel", panel);
             Set(ui, "startButton", start);
             return ui;
@@ -303,7 +294,7 @@ namespace MarioKart.EditorTools
 
         private static ImageUploadUI BuildUploadPanel(Canvas canvas, Font font)
         {
-            var panel = CreatePanel(canvas.transform, "UploadPanel", dim: true);
+            var panel = CreatePanel(canvas.transform, "ImageUploadUI", dim: true, out var holder);
             CreateText(panel.transform, "Title", "Describe your world", font, 48, Center, new Vector2(0f, 360f), new Vector2(1200f, 70f), TextAnchor.MiddleCenter);
 
             var preview = new GameObject("Preview", typeof(RawImage)).GetComponent<RawImage>();
@@ -315,7 +306,7 @@ namespace MarioKart.EditorTools
             var description = CreateInputField(panel.transform, "DescriptionField", "One sentence about the scene in the photo...", font, new Vector2(0f, -210f), new Vector2(900f, 70f));
             var generate = CreateButton(panel.transform, "GenerateButton", "Generate World", font, new Vector2(0f, -310f), new Vector2(320f, 80f));
 
-            var ui = panel.AddComponent<ImageUploadUI>();
+            var ui = holder.AddComponent<ImageUploadUI>();
             Set(ui, "panel", panel);
             Set(ui, "chooseImageButton", choose);
             Set(ui, "previewImage", preview);
@@ -326,25 +317,32 @@ namespace MarioKart.EditorTools
 
         private static GenerationUI BuildGeneratingPanel(Canvas canvas, Font font)
         {
-            var panel = CreatePanel(canvas.transform, "GeneratingPanel", dim: true);
-            CreateText(panel.transform, "Status", "Generating your world...", font, 48, Center, Vector2.zero, new Vector2(1200f, 80f), TextAnchor.MiddleCenter);
+            var panel = CreatePanel(canvas.transform, "GenerationUI", dim: false, out var holder);
+            var status = CreateText(panel.transform, "Status", "Generating your world...", font, 72, Center, Vector2.zero, new Vector2(1200f, 120f), TextAnchor.MiddleCenter);
 
-            var ui = panel.AddComponent<GenerationUI>();
+            // No dim overlay here so the countdown plays over the freshly built
+            // world; give the text an outline so it reads on any background.
+            var outline = status.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
+            outline.effectDistance = new Vector2(3f, -3f);
+
+            var ui = holder.AddComponent<GenerationUI>();
             Set(ui, "panel", panel);
+            Set(ui, "statusText", status);
             return ui;
         }
 
         private static RaceHUD BuildHudPanel(Canvas canvas, Font font, LapManager p1, LapManager p2)
         {
             // No dim overlay: the HUD sits on top of the live race.
-            var panel = CreatePanel(canvas.transform, "HUDPanel", dim: false);
+            var panel = CreatePanel(canvas.transform, "RaceHUD", dim: false, out var holder);
 
             // Top-left of each player's half of the screen.
             var p1Text = CreateText(panel.transform, "P1Text", "P1 Lap 0", font, 36, new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(400f, 50f), TextAnchor.UpperLeft);
             var p2Text = CreateText(panel.transform, "P2Text", "P2 Lap 0", font, 36, new Vector2(0f, 0.5f), new Vector2(24f, -24f), new Vector2(400f, 50f), TextAnchor.UpperLeft);
             p1Text.rectTransform.pivot = p2Text.rectTransform.pivot = new Vector2(0f, 1f);
 
-            var ui = panel.AddComponent<RaceHUD>();
+            var ui = holder.AddComponent<RaceHUD>();
             Set(ui, "panel", panel);
             Set(ui, "player1Laps", p1);
             Set(ui, "player2Laps", p2);
@@ -355,12 +353,12 @@ namespace MarioKart.EditorTools
 
         private static ResultsUI BuildResultsPanel(Canvas canvas, Font font)
         {
-            var panel = CreatePanel(canvas.transform, "ResultsPanel", dim: true);
+            var panel = CreatePanel(canvas.transform, "ResultsUI", dim: true, out var holder);
             CreateText(panel.transform, "Title", "Results", font, 64, Center, new Vector2(0f, 220f), new Vector2(800f, 90f), TextAnchor.MiddleCenter);
             var body = CreateText(panel.transform, "ResultsText", "", font, 40, Center, new Vector2(0f, 40f), new Vector2(1000f, 220f), TextAnchor.MiddleCenter);
             var again = CreateButton(panel.transform, "PlayAgainButton", "Play Again", font, new Vector2(0f, -180f), new Vector2(320f, 80f));
 
-            var ui = panel.AddComponent<ResultsUI>();
+            var ui = holder.AddComponent<ResultsUI>();
             Set(ui, "panel", panel);
             Set(ui, "resultsText", body);
             Set(ui, "playAgainButton", again);
@@ -369,14 +367,22 @@ namespace MarioKart.EditorTools
 
         // ---- UI primitives ---------------------------------------------------
 
-        private static GameObject CreatePanel(Transform canvas, string name, bool dim)
+        /// <summary>
+        /// Two objects, not one: the UI script lives on `holder` (always
+        /// active) and toggles the `Panel` child. The UI scripts subscribe to
+        /// GameManager in OnEnable and unsubscribe in OnDisable, so a script
+        /// that sat on the panel it hides would deactivate itself, unsubscribe,
+        /// and never hear another state change.
+        /// </summary>
+        private static GameObject CreatePanel(Transform canvas, string name, bool dim, out GameObject holder)
         {
-            var panel = new GameObject(name, typeof(RectTransform));
-            panel.transform.SetParent(canvas, false);
-            var rect = panel.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            holder = new GameObject(name, typeof(RectTransform));
+            holder.transform.SetParent(canvas, false);
+            Stretch(holder.GetComponent<RectTransform>());
+
+            var panel = new GameObject("Panel", typeof(RectTransform));
+            panel.transform.SetParent(holder.transform, false);
+            Stretch(panel.GetComponent<RectTransform>());
 
             if (dim)
             {
