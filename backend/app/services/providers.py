@@ -20,10 +20,14 @@ from app.services.mesh_generation_service import (
     MeshyMeshGenerationService,
     MockMeshGenerationService,
 )
+from app.services.text_asset_service import ClaudeTextAssetService, MockTextAssetService, TextAssetService
 from app.services.vision_service import ClaudeVisionService, MockVisionService, VisionService
 from app.services.world_synthesis_service import MockWorldSynthesisService, WorldSynthesisService
 
 DEFAULT_MAX_OBJECTS_PER_WORLD = 4
+# Each text asset costs TWO Meshy jobs (preview + refine), vs. one for an
+# image crop, so this defaults lower than DEFAULT_MAX_OBJECTS_PER_WORLD.
+DEFAULT_MAX_TEXT_ASSETS_PER_WORLD = 2
 
 
 @dataclass
@@ -31,8 +35,10 @@ class Providers:
     vision: VisionService
     mesh: MeshGenerationService
     synthesis: WorldSynthesisService
+    text_assets: TextAssetService
     registry: MeshTaskRegistry
     max_objects_per_world: int
+    max_text_assets_per_world: int
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -44,6 +50,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 def build_from_env() -> Providers:
     max_objects = int(os.environ.get("MAX_OBJECTS_PER_WORLD", DEFAULT_MAX_OBJECTS_PER_WORLD))
+    max_text_assets = int(os.environ.get("MAX_TEXT_ASSETS_PER_WORLD", DEFAULT_MAX_TEXT_ASSETS_PER_WORLD))
 
     ai_provider = os.environ.get("AI_PROVIDER", "mock").strip().lower()
     if ai_provider == "mock":
@@ -66,16 +73,31 @@ def build_from_env() -> Providers:
             api_key=api_key,
             model_type=os.environ.get("MESHY_MODEL_TYPE", "lowpoly"),
             should_texture=_env_bool("MESHY_SHOULD_TEXTURE", True),
+            text_geometry_resolution=os.environ.get("MESHY_TEXT_GEOMETRY_RESOLUTION", "standard"),
+            text_texture_resolution=os.environ.get("MESHY_TEXT_TEXTURE_RESOLUTION", "2k"),
+            text_enable_pbr=_env_bool("MESHY_TEXT_ENABLE_PBR", False),
         )
     else:
         raise RuntimeError(f"unknown MESH_PROVIDER {mesh_provider!r} (expected 'mock' or 'meshy')")
+
+    text_asset_provider = os.environ.get("TEXT_ASSET_PROVIDER", "mock").strip().lower()
+    if text_asset_provider == "mock":
+        text_assets: TextAssetService = MockTextAssetService()
+    elif text_asset_provider == "claude":
+        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+            raise RuntimeError("TEXT_ASSET_PROVIDER=claude requires ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN)")
+        text_assets = ClaudeTextAssetService(max_assets=max_text_assets)
+    else:
+        raise RuntimeError(f"unknown TEXT_ASSET_PROVIDER {text_asset_provider!r} (expected 'mock' or 'claude')")
 
     return Providers(
         vision=vision,
         mesh=mesh,
         synthesis=MockWorldSynthesisService(),
+        text_assets=text_assets,
         registry=MeshTaskRegistry(),
         max_objects_per_world=max_objects,
+        max_text_assets_per_world=max_text_assets,
     )
 
 

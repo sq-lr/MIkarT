@@ -24,6 +24,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.services.object_cropper import ObjectCrop
+from app.services.text_asset_service import ExtractedAsset
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,16 @@ class MeshGenerationService(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def submit_text(self, asset: ExtractedAsset) -> MeshTask | None:
+        """Start generating a mesh from a text prompt alone (no photo crop).
+        Returns immediately with a single public task_id that stays valid for
+        the object's whole lifecycle, even for a provider whose real API is a
+        multi-phase workflow underneath (see MeshyMeshGenerationService).
+        Returns None when this provider doesn't generate meshes (mock);
+        raises on a real provider error."""
+        raise NotImplementedError
+
+    @abstractmethod
     def get_status(self, task_id: str) -> MeshTaskStatus:
         raise NotImplementedError
 
@@ -67,6 +78,9 @@ class MockMeshGenerationService(MeshGenerationService):
     def submit(self, crop: ObjectCrop) -> MeshTask | None:
         return None
 
+    def submit_text(self, asset: ExtractedAsset) -> MeshTask | None:
+        return None
+
     def get_status(self, task_id: str) -> MeshTaskStatus:
         return MeshTaskStatus(status="failed", error="mock provider generates no meshes")
 
@@ -75,6 +89,12 @@ class MockMeshGenerationService(MeshGenerationService):
 
 
 MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1"
+
+# Text-to-3D lives on a different API version than image-to-3d. Passed as an
+# absolute URL to self._client.post/get, which bypasses the client's v1
+# base_url -- the same trick fetch_model() already uses for Meshy's signed
+# CDN download URLs.
+MESHY_TEXT_TO_3D_URL = "https://api.meshy.ai/openapi/v2/text-to-3d"
 
 # Meshy task status -> our provider-neutral status.
 _MESHY_STATUS_MAP: dict[str, MeshStatus] = {
@@ -86,13 +106,37 @@ _MESHY_STATUS_MAP: dict[str, MeshStatus] = {
 }
 
 
-class MeshyMeshGenerationService(MeshGenerationService):
-    """Meshy Image-to-3D (https://docs.meshy.ai/en/api/image-to-3d).
+class _TextTaskState:
+    """Tracks one text-to-3d asset's progress through Meshy's two-phase
+    preview -> refine workflow. `refine_task_id` is None until the preview
+    succeeds and refine has been kicked off; `refine_lock` guards that
+    check-then-set so two concurrent pollers can't both submit refine."""
 
-    submit  -> POST /image-to-3d with the crop as a base64 data URI
-    status  -> GET  /image-to-3d/{id}
-    fetch   -> download model_urls.glb, cached in-process so Unity's download
-               and any retry don't re-hit Meshy's (expiring) signed URL.
+    __slots__ = ("refine_task_id", "refine_lock")
+
+    def __init__(self) -> None:
+        self.refine_task_id: str | None = None
+        self.refine_lock = threading.Lock()
+
+
+class MeshyMeshGenerationService(MeshGenerationService):
+    """Meshy Image-to-3D (https://docs.meshy.ai/en/api/image-to-3d) and
+    Text-to-3D (https://docs.meshy.ai/en/api/text-to-3d).
+
+    Image-to-3D:
+        submit  -> POST /image-to-3d with the crop as a base64 data URI
+        status  -> GET  /image-to-3d/{id}
+        fetch   -> download model_urls.glb
+
+    Text-to-3D is a two-phase workflow (preview: untextured geometry, then
+    refine: adds texture, referencing the preview's result) -- submit_text
+    kicks off only the preview and returns its task_id as the single public
+    id for the asset's whole lifecycle; get_status/fetch_model transparently
+    detect "preview succeeded" and submit refine themselves, so callers never
+    see the two phases (see docs/decisions/0007-text-to-3d-key-assets.md).
+
+    Both endpoints share one in-process GLB cache so Unity's download and any
+    retry don't re-hit Meshy's (expiring) signed URL.
     """
 
     def __init__(
@@ -101,6 +145,9 @@ class MeshyMeshGenerationService(MeshGenerationService):
         model_type: str = "lowpoly",
         should_texture: bool = True,
         base_url: str = MESHY_BASE_URL,
+        text_geometry_resolution: str = "standard",
+        text_texture_resolution: str = "2k",
+        text_enable_pbr: bool = False,
         transport: httpx.BaseTransport | None = None,
         timeout: float = 30.0,
     ):
@@ -108,6 +155,9 @@ class MeshyMeshGenerationService(MeshGenerationService):
             raise ValueError("MESHY_API_KEY is required for MESH_PROVIDER=meshy")
         self._model_type = model_type
         self._should_texture = should_texture
+        self._text_geometry_resolution = text_geometry_resolution
+        self._text_texture_resolution = text_texture_resolution
+        self._text_enable_pbr = text_enable_pbr
         self._client = httpx.Client(
             base_url=base_url,
             headers={"Authorization": f"Bearer {api_key}"},
@@ -116,6 +166,11 @@ class MeshyMeshGenerationService(MeshGenerationService):
         )
         self._model_cache: dict[str, bytes] = {}
         self._lock = threading.Lock()
+        # task_id (the preview task's id, our public id) -> its phase state.
+        # Only ever guards dict read/insert, never a network call, so
+        # concurrent get_status calls for *different* task_ids never contend.
+        self._text_tasks: dict[str, _TextTaskState] = {}
+        self._text_tasks_lock = threading.Lock()
 
     def submit(self, crop: ObjectCrop) -> MeshTask | None:
         data_uri = "data:image/png;base64," + base64.standard_b64encode(crop.png_bytes).decode("ascii")
@@ -133,7 +188,29 @@ class MeshyMeshGenerationService(MeshGenerationService):
         logger.info("meshy: submitted %s -> task %s", crop.label, task_id)
         return MeshTask(task_id=task_id, object_type=crop.label, provider="meshy")
 
+    def submit_text(self, asset: ExtractedAsset) -> MeshTask | None:
+        response = self._client.post(
+            MESHY_TEXT_TO_3D_URL,
+            json={
+                "mode": "preview",
+                "prompt": asset.prompt,
+                "ai_model": "latest",
+                "geometry_resolution": self._text_geometry_resolution,
+            },
+        )
+        response.raise_for_status()
+        preview_task_id = response.json()["result"]
+        with self._text_tasks_lock:
+            self._text_tasks[preview_task_id] = _TextTaskState()
+        logger.info("meshy: submitted text asset %s -> preview task %s", asset.label, preview_task_id)
+        return MeshTask(task_id=preview_task_id, object_type=asset.label, provider="meshy")
+
     def get_status(self, task_id: str) -> MeshTaskStatus:
+        with self._text_tasks_lock:
+            state = self._text_tasks.get(task_id)
+        if state is not None:
+            return self._get_text_status(task_id, state)
+
         response = self._client.get(f"/image-to-3d/{task_id}")
         response.raise_for_status()
         body = response.json()
@@ -153,9 +230,80 @@ class MeshyMeshGenerationService(MeshGenerationService):
         if cached is not None:
             return cached
 
-        response = self._client.get(f"/image-to-3d/{task_id}")
+        with self._text_tasks_lock:
+            state = self._text_tasks.get(task_id)
+        if state is not None:
+            with state.refine_lock:
+                refine_id = state.refine_task_id
+            if refine_id is None:
+                return None  # refine hasn't started (or succeeded) yet
+            body = self._get_text_to_3d(refine_id)
+        else:
+            response = self._client.get(f"/image-to-3d/{task_id}")
+            response.raise_for_status()
+            body = response.json()
+
+        return self._extract_and_cache_glb(task_id, body)
+
+    # -- Text-to-3D helpers -------------------------------------------------
+
+    def _get_text_to_3d(self, task_id: str) -> dict:
+        response = self._client.get(f"{MESHY_TEXT_TO_3D_URL}/{task_id}")
         response.raise_for_status()
-        body = response.json()
+        return response.json()
+
+    def _submit_refine(self, preview_task_id: str) -> str:
+        response = self._client.post(
+            MESHY_TEXT_TO_3D_URL,
+            json={
+                "mode": "refine",
+                "preview_task_id": preview_task_id,
+                "enable_pbr": self._text_enable_pbr,
+                "texture_resolution": self._text_texture_resolution,
+            },
+        )
+        response.raise_for_status()
+        refine_task_id = response.json()["result"]
+        logger.info("meshy: preview %s succeeded, submitted refine task %s", preview_task_id, refine_task_id)
+        return refine_task_id
+
+    def _get_text_status(self, task_id: str, state: _TextTaskState) -> MeshTaskStatus:
+        with state.refine_lock:
+            refine_id = state.refine_task_id
+        if refine_id is not None:
+            body = self._get_text_to_3d(refine_id)
+            meshy_status = body.get("status", "")
+            if meshy_status == "SUCCEEDED":
+                return MeshTaskStatus(status="ready", progress=100)
+            if meshy_status in ("FAILED", "CANCELED"):
+                error = (body.get("task_error") or {}).get("message") or meshy_status
+                return MeshTaskStatus(status="failed", progress=0, error=error)
+            # PENDING/IN_PROGRESS (or unknown): refine is the back half.
+            progress = 50 + int(body.get("progress", 0)) // 2
+            return MeshTaskStatus(status="pending", progress=min(progress, 100))
+
+        # No refine yet: this is still the preview phase.
+        body = self._get_text_to_3d(task_id)
+        meshy_status = body.get("status", "")
+        if meshy_status in ("FAILED", "CANCELED"):
+            error = (body.get("task_error") or {}).get("message") or meshy_status
+            return MeshTaskStatus(status="failed", progress=0, error=error)
+        if meshy_status == "SUCCEEDED":
+            # Kick off refine exactly once, even if multiple threads observe
+            # "preview succeeded" at the same time.
+            with state.refine_lock:
+                if state.refine_task_id is None:
+                    state.refine_task_id = self._submit_refine(task_id)
+            return MeshTaskStatus(status="pending", progress=50)
+        if meshy_status not in ("PENDING", "IN_PROGRESS"):
+            logger.warning("meshy: unknown text-to-3d status %r for preview task %s", meshy_status, task_id)
+        # PENDING/IN_PROGRESS (or unknown): preview is the front half.
+        return MeshTaskStatus(status="pending", progress=int(body.get("progress", 0)) // 2)
+
+    def _extract_and_cache_glb(self, task_id: str, body: dict) -> bytes | None:
+        """Shared tail for both image-to-3d and text-to-3d fetch_model: given
+        a Meshy status body, download and cache its model_urls.glb (keyed by
+        our public task_id) if the task succeeded."""
         if body.get("status") != "SUCCEEDED":
             return None
         glb_url = (body.get("model_urls") or {}).get("glb")

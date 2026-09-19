@@ -19,12 +19,14 @@ world.
 One Image + One Text Description
         ↓
 AI backend (FastAPI, mock by default)
-  VLM (Claude vision) → scene info + object bounding boxes
-  ObjectCropper      → one image crop per object
-  Meshy Image-to-3D  → one async mesh task per crop
+  VLM (Claude vision)      → scene info + object bounding boxes
+  ObjectCropper            → one image crop per object
+  Text-asset extraction    → key props named in the description (Claude)
+  Meshy Image-to-3D        → one async mesh task per crop
+  Meshy Text-to-3D         → one async mesh task per extracted text asset
         ↓
 WorldRecipe (versioned JSON contract — schemas/world_recipe.schema.json)
-  objects[].type  = VLM label,  objects[].asset = {task_id} (optional)
+  objects[].type  = VLM label or text-extracted label,  objects[].asset = {task_id} (optional)
         ↓
 Unity (WorldGenerator → TrackGenerator + EnvironmentGenerator)
         ↓
@@ -50,6 +52,9 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ Offline fallback (DefaultWorldRecipe) if the backend call fails
 ✓ VLM object extraction (Claude vision) + Meshy image-to-3D meshes for the
   objects in the photo, behind interfaces; mock providers are the default
+✓ Text-based key-asset extraction (Claude, text-only) for props named in the
+  description but not necessarily in the photo, + Meshy text-to-3D meshes
+  for them — see docs/decisions/0007-text-to-3d-key-assets.md
 ✓ Async mesh delivery: race starts on primitive placeholders, generated
   meshes swap in when ready (placeholders stay if generation fails)
 
@@ -60,7 +65,10 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✗ Complex procedural terrain
 ✗ Asset retrieval / asset-pack lookup (replaced by mesh generation)
 ✗ Real LLM-based world synthesis (theme/palette/track are still a
-  deterministic mock; only vision + mesh generation are real vendors)
+  deterministic mock; only vision, text-asset extraction, and mesh
+  generation are real vendors)
+✗ Ground texture / skybox generation from text (deferred — see
+  docs/decisions/0007-text-to-3d-key-assets.md)
 ✗ Persisting generated meshes across backend restarts
 ✗ Polished UI, final VFX, production auth, cloud deployment
 ✗ Webcam capture or drag-and-drop image upload (file-picker only, Editor-only for now — see docs/decisions/0003-image-picker-stub.md)
@@ -70,7 +78,7 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 
 | Owner | Directories |
 |---|---|
-| Person A — AI / backend / WorldRecipe | `backend/**` (vision, cropper, Meshy client, `/generate-world`, `/assets`), `schemas/**`, `unity/Assets/Scripts/AI/**` (incl. `MeshAssetClient.cs`) |
+| Person A — AI / backend / WorldRecipe | `backend/**` (vision, text-asset extraction, cropper, Meshy client, `/generate-world`, `/assets`), `schemas/**`, `unity/Assets/Scripts/AI/**` (incl. `MeshAssetClient.cs`) |
 | Person B — Unity gameplay / track / racing | `unity/Assets/Scripts/Core/**`, `Players/**`, `Racing/**`, `World/TrackGenerator.cs`, `World/WorldGenerator.cs` |
 | Person C — assets / generated meshes / environment | `unity/Assets/Scripts/Assets/**` (namespace `MarioKart.AssetsSystem`, incl. `GeneratedMeshLoader.cs`), `World/EnvironmentGenerator.cs` |
 | Person D — UI / upload flow / QA | `unity/Assets/Scripts/UI/**`, `Input/**`, manual playtesting |

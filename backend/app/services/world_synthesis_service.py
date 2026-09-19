@@ -7,6 +7,7 @@ can replace it later without changing the /generate-world contract.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 
 from app.models.world_recipe import (
@@ -18,7 +19,15 @@ from app.models.world_recipe import (
     derive_seed,
 )
 from app.services.mesh_generation_service import MeshTask
+from app.services.text_asset_service import ExtractedAsset
 from app.services.vision_service import SceneUnderstanding
+
+logger = logging.getLogger(__name__)
+
+# Mirrors WorldRecipe.objects' max_length -- keep in sync by hand, same as
+# every other schema constant duplicated between app.models.world_recipe and
+# schemas/world_recipe.schema.json.
+_MAX_RECIPE_OBJECTS = 12
 
 
 class WorldSynthesisService(ABC):
@@ -28,10 +37,16 @@ class WorldSynthesisService(ABC):
         scene: SceneUnderstanding,
         description: str,
         mesh_tasks: list[MeshTask] | None = None,
+        text_assets: list[ExtractedAsset] | None = None,
+        text_mesh_tasks: list[MeshTask] | None = None,
     ) -> WorldRecipe:
         """`mesh_tasks` are the in-flight mesh generations for this world, one
         per detected object type that was successfully submitted; each becomes
-        that object's `asset` handle in the recipe."""
+        that object's `asset` handle in the recipe. `text_assets` are the
+        props extracted from the player's description alone (not necessarily
+        in the photo); `text_mesh_tasks` are the in-flight generations for
+        those, matched to `text_assets` by label the same way `mesh_tasks` is
+        matched to `scene.detected_objects`."""
         raise NotImplementedError
 
 
@@ -126,6 +141,34 @@ def _objects_from_scene(scene: SceneUnderstanding, mesh_tasks: list[MeshTask]) -
     return entries
 
 
+def _objects_from_text_assets(
+    text_assets: list[ExtractedAsset],
+    text_mesh_tasks: list[MeshTask],
+    taken_labels: set[str],
+) -> list[WorldObjectEntry]:
+    """One entry per extracted asset, skipping any label already claimed by a
+    photo-detected object -- photo-derived wins on collision, since the text
+    extraction never sees the photo and can't know it's about to duplicate
+    something actually in the player's picture."""
+    task_by_label = {task.object_type: task for task in text_mesh_tasks}
+    entries: list[WorldObjectEntry] = []
+    seen = set(taken_labels)
+    for asset in text_assets:
+        if asset.label in seen:
+            logger.info("text asset %r collides with a photo-detected object; skipping", asset.label)
+            continue
+        seen.add(asset.label)
+        task = task_by_label.get(asset.label)
+        entries.append(
+            WorldObjectEntry(
+                type=asset.label,
+                density=asset.density,
+                asset=ObjectAsset(task_id=task.task_id, provider=task.provider) if task else None,
+            )
+        )
+    return entries
+
+
 class MockWorldSynthesisService(WorldSynthesisService):
     """Deterministic mock: same (scene, description) always yields the same
     WorldRecipe (mesh task IDs aside). No external AI call is made."""
@@ -135,14 +178,23 @@ class MockWorldSynthesisService(WorldSynthesisService):
         scene: SceneUnderstanding,
         description: str,
         mesh_tasks: list[MeshTask] | None = None,
+        text_assets: list[ExtractedAsset] | None = None,
+        text_mesh_tasks: list[MeshTask] | None = None,
     ) -> WorldRecipe:
         profile_key = _pick_profile_key(scene, description)
         profile = _THEME_PROFILES[profile_key]
         seed = derive_seed(description, profile_key, "".join(scene.dominant_colors))
 
-        objects = _objects_from_scene(scene, mesh_tasks or [])
+        photo_objects = _objects_from_scene(scene, mesh_tasks or [])
+        text_objects = _objects_from_text_assets(
+            text_assets or [], text_mesh_tasks or [], {o.type for o in photo_objects}
+        )
+        objects = photo_objects + text_objects
         if not objects:
             objects = list(profile["objects"])
+        if len(objects) > _MAX_RECIPE_OBJECTS:
+            logger.warning("world has %d objects, truncating to %d", len(objects), _MAX_RECIPE_OBJECTS)
+            objects = objects[:_MAX_RECIPE_OBJECTS]
 
         return WorldRecipe(
             version=1,

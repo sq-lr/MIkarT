@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from app.main import app
 from app.models.world_recipe import WorldRecipe
 from app.services.mesh_generation_service import MeshTask
+from app.services.text_asset_service import ExtractedAsset
 from app.services.vision_service import DetectedObject, SceneUnderstanding
 from app.services.world_synthesis_service import MockWorldSynthesisService
 from tests.conftest import make_png
@@ -148,4 +149,64 @@ def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
     assert [(o.type, o.density) for o in recipe.objects] == [("lantern", 0.35), ("rock", 0.2)]
     assert recipe.objects[0].asset is not None and recipe.objects[0].asset.task_id == "task-lantern"
     assert recipe.objects[1].asset is None
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_merges_text_assets_after_photo_objects():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="lantern", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.35)],
+    )
+    photo_tasks = [MeshTask(task_id="task-lantern", object_type="lantern", provider="meshy")]
+    text_assets = [ExtractedAsset(label="whale_statue", prompt="a giant stone whale", density=0.15)]
+    text_tasks = [MeshTask(task_id="text-whale_statue", object_type="whale_statue", provider="meshy")]
+
+    recipe = service.synthesize(scene, "beach", photo_tasks, text_assets, text_tasks)
+
+    assert [(o.type, o.density) for o in recipe.objects] == [("lantern", 0.35), ("whale_statue", 0.15)]
+    assert recipe.objects[1].asset is not None and recipe.objects[1].asset.task_id == "text-whale_statue"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_dedups_text_asset_colliding_with_photo_label():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="whale", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.35)],
+    )
+    photo_tasks = [MeshTask(task_id="task-whale", object_type="whale", provider="meshy")]
+    text_assets = [ExtractedAsset(label="whale", prompt="a different whale prompt", density=0.9)]
+    text_tasks = [MeshTask(task_id="text-whale", object_type="whale", provider="meshy")]
+
+    recipe = service.synthesize(scene, "beach", photo_tasks, text_assets, text_tasks)
+
+    # Only the photo-derived "whale" survives, with its own density/asset.
+    assert [o.type for o in recipe.objects] == ["whale"]
+    assert recipe.objects[0].density == 0.35
+    assert recipe.objects[0].asset.task_id == "task-whale"
+
+
+def test_synthesis_truncates_combined_objects_to_twelve():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[
+            DetectedObject(label=f"photo_{i}", bbox=[0.1, 0.1, 0.1, 0.1], prominence=0.5) for i in range(8)
+        ],
+    )
+    text_assets = [ExtractedAsset(label=f"text_{i}", prompt="p", density=0.2) for i in range(8)]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    assert len(recipe.objects) == 12
+    # All 8 photo objects survive; only the first 4 text objects fit.
+    assert [o.type for o in recipe.objects[:8]] == [f"photo_{i}" for i in range(8)]
+    assert [o.type for o in recipe.objects[8:]] == [f"text_{i}" for i in range(4)]
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
