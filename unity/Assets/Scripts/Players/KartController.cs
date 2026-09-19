@@ -31,7 +31,7 @@ namespace MarioKart.Players
 
         private void FixedUpdate()
         {
-            float forwardSpeed = Vector3.Dot(rb.velocity, transform.forward);
+            float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
             float speedFactor = Mathf.Clamp01(1f - Mathf.Abs(forwardSpeed) / maxSpeed);
 
             if (currentInput.throttle > 0f)

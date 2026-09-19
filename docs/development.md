@@ -33,16 +33,16 @@ them risks silently corrupting the project (see
 `docs/decisions/0005-no-handauthored-unity-assets.md`). Whoever opens the
 project first must run this checklist once, then commit the results:
 
-1. Install **Unity Hub** and **Unity 2022.3.x LTS** (pinned in
-   `unity/ProjectSettings/ProjectVersion.txt`; any 2022.3.x patch will open
+1. Install **Unity Hub** and **Unity 6000.0.x** (pinned to 6000.0.23f1 in
+   `unity/ProjectSettings/ProjectVersion.txt`; any 6000.0.x patch will open
    the project, an exact match isn't required).
 2. Open `unity/` as a project in Unity Hub. Let it import — this generates
    `Library/`, resolves `Packages/manifest.json` (including
    `com.unity.nuget.newtonsoft-json` and `com.unity.cloud.gltfast`, which
    pulls in Burst/Collections/Mathematics), and creates `.meta` files for
    every script.
-3. Create `Assets/Scenes/Main.unity` and set it as the only scene in Build
-   Settings. This is the one and only scene for the whole game — `GameState`
+3. Open `Assets/Scenes/Main.unity` (already committed, empty, and registered
+   as the only scene in Build Settings). This is the one and only scene for the whole game — `GameState`
    drives which UI panel is visible, not scene loading.
 4. Create empty GameObjects and attach scripts:
    - `GameManager` → `Core/GameManager.cs`

@@ -50,7 +50,7 @@ build it (code). Details: `docs/architecture.md`, `docs/world-recipe.md`,
 ## Tech stack
 
 - **Backend:** Python 3.11+, FastAPI, Pydantic v2, Pillow, `anthropic` SDK (Claude vision), httpx (Meshy), pytest
-- **Frontend:** Unity 2022.3 LTS, Built-in Render Pipeline, C#, Newtonsoft.Json, glTFast (runtime GLB import)
+- **Frontend:** Unity 6 (6000.0.23f1), Built-in Render Pipeline, C#, Newtonsoft.Json, glTFast (runtime GLB import)
 
 ## Backend setup
 
@@ -86,10 +86,10 @@ credits and takes minutes; Unity races on placeholders until they arrive.
 
 ## Unity setup
 
-Open `unity/` in Unity Hub with Unity 2022.3.x LTS. No scene/prefab files
-are committed yet (see `docs/decisions/0005-no-handauthored-unity-assets.md`)
-— follow the one-time setup checklist in `docs/development.md` before you
-can press Play.
+Open `unity/` in Unity Hub with Unity 6000.0.x. `Assets/Scenes/Main.unity`
+and `ProjectSettings/` are Editor-generated and committed, but the scene is
+still empty — follow the one-time setup checklist in `docs/development.md`
+to add and wire the GameObjects before you can press Play.
 
 ## Development workflow
 
