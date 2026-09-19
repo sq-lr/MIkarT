@@ -116,13 +116,14 @@ see `docs/development.md`), and ADRs under `docs/decisions/`.
 
 ## Known limitations of this bootstrap
 
-- No Unity scene, prefab, or `.meta` files are committed — they require the
-  Editor's GUID allocation and cannot be safely hand-authored. See
-  `docs/decisions/0005-no-handauthored-unity-assets.md` and the setup
-  checklist in `docs/development.md`.
-- Unity-side determinism (`WorldRandom`, `TrackGenerator`) has not been
-  compiled or run — only reviewed for syntax/consistency. Verify inside the
-  Editor before relying on it.
+- Unity scenes and `.meta` files are never hand-authored — they need the
+  Editor's GUID allocation. `Assets/Scenes/Main.unity` is (re)built by the
+  **MarioKart → Build Main Scene** menu item (`Assets/Editor/MainSceneBuilder.cs`),
+  which is the source of truth for the hierarchy and Inspector wiring. See
+  `docs/decisions/0005-no-handauthored-unity-assets.md` and
+  `docs/development.md`.
+- Unity-side determinism (`WorldRandom`, `TrackGenerator`) compiles but has
+  not been run end-to-end — verify inside the Editor before relying on it.
 - Real image picking (native file dialog) only works inside the Unity
   Editor; standalone builds use a bundled placeholder image.
 - The mesh task registry is in-memory: restarting the backend orphans any

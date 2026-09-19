@@ -27,6 +27,17 @@ namespace MarioKart.Racing
             totalLaps = lapCount;
         }
 
+        /// <summary>
+        /// Back to the start line. Called by RaceManager.ResetRace before
+        /// every race so "Play Again" starts from lap 0.
+        /// </summary>
+        public void ResetProgress()
+        {
+            nextExpectedCheckpoint = 0;
+            CurrentLap = 0;
+            Finished = false;
+        }
+
         public void OnCheckpointPassed(int checkpointIndex)
         {
             if (Finished || checkpointIndex != nextExpectedCheckpoint) return;

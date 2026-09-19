@@ -41,6 +41,19 @@ namespace MarioKart.Racing
             }
         }
 
+        /// <summary>
+        /// Clear the previous outcome and every player's lap progress.
+        /// RaceBootstrap calls this on WorldReady, before the countdown.
+        /// </summary>
+        public void ResetRace()
+        {
+            finishedPlayers.Clear();
+            foreach (var player in players)
+            {
+                player.ResetProgress();
+            }
+        }
+
         private int GetCheckpointCountFor(LapManager player)
         {
             // Placeholder: real checkpoint count comes from the generated

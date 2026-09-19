@@ -12,7 +12,12 @@ namespace MarioKart.Core
     /// Owns the single source of truth for game flow (see GameState). UI
     /// panels read CurrentState / OnStateChanged and call back into
     /// GameManager -- they never mutate state themselves.
+    ///
+    /// Runs before every other script so Instance is set before any UI
+    /// panel's OnEnable reads it (Awake order across scene objects is
+    /// otherwise unspecified).
     /// </summary>
+    [DefaultExecutionOrder(-100)]
     public class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }

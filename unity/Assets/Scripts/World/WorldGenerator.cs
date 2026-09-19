@@ -74,6 +74,10 @@ namespace MarioKart.World
                 var go = new GameObject($"Checkpoint_{i}");
                 go.transform.SetParent(checkpointRoot, worldPositionStays: false);
                 go.transform.position = track.checkpointPositions[i];
+                // Face the track tangent so the (width, 4, 2) box below is a
+                // gate *across* the track everywhere on the loop, not just
+                // where the track happens to run along the Z axis.
+                go.transform.rotation = Quaternion.LookRotation(TangentAt(track, i * (track.controlPoints.Count / track.checkpointPositions.Count)), Vector3.up);
 
                 var collider = go.AddComponent<BoxCollider>();
                 collider.isTrigger = true;
@@ -82,6 +86,21 @@ namespace MarioKart.World
                 var checkpoint = go.AddComponent<Checkpoint>();
                 checkpoint.checkpointIndex = i;
             }
+        }
+
+        /// <summary>
+        /// Direction of travel at control point `index` (central difference
+        /// around the loop). Shared by checkpoints and the start-line
+        /// placement in RaceBootstrap.
+        /// </summary>
+        public static Vector3 TangentAt(GeneratedTrack track, int index)
+        {
+            int count = track.controlPoints.Count;
+            var prev = track.controlPoints[(index - 1 + count) % count];
+            var next = track.controlPoints[(index + 1) % count];
+            var tangent = next - prev;
+            tangent.y = 0f;
+            return tangent.sqrMagnitude > 0f ? tangent.normalized : Vector3.forward;
         }
 
         private void ApplyPalette(List<string> palette)

@@ -41,36 +41,44 @@ project first must run this checklist once, then commit the results:
    `com.unity.nuget.newtonsoft-json` and `com.unity.cloud.gltfast`, which
    pulls in Burst/Collections/Mathematics), and creates `.meta` files for
    every script.
-3. Open `Assets/Scenes/Main.unity` (already committed, empty, and registered
-   as the only scene in Build Settings). This is the one and only scene for the whole game — `GameState`
+3. Run **MarioKart → Build Main Scene** from the Editor menu bar. This is
+   `Assets/Editor/MainSceneBuilder.cs`: it rebuilds `Assets/Scenes/Main.unity`
+   from scratch (confirming first if the scene isn't empty), creates the two
+   kart materials + ground material under `Assets/Materials/`, wires every
+   `[SerializeField]` reference, and registers the scene as the only one in
+   Build Settings. Re-run it any time the scene gets into a bad state.
+   `Main.unity` is the one and only scene for the whole game — `GameState`
    drives which UI panel is visible, not scene loading.
-4. Create empty GameObjects and attach scripts:
-   - `GameManager` → `Core/GameManager.cs`
-   - `WorldRecipeClient` (can be the same or a child GameObject) → `AI/WorldRecipeClient.cs`
-   - `MeshAssetClient` (same GameObject as `WorldRecipeClient` is fine) → `AI/MeshAssetClient.cs`
-   - `WorldGenerator` → `World/WorldGenerator.cs`, with a child `EnvironmentGenerator` → `World/EnvironmentGenerator.cs`
-     **and**, on that same `EnvironmentGenerator` GameObject, `Assets/GeneratedMeshLoader.cs`
-     (not on a child — `EnvironmentGenerator.Generate` destroys its children)
-   - `RaceManager` → `Racing/RaceManager.cs`
-   - Two kart GameObjects, each with a `Rigidbody` + `Players/KartController.cs` + `Players/PlayerController.cs` + `Input/PlayerInput.cs` (set `playerIndex` to 1/2)
-   - Two `Camera` GameObjects, each with `Camera/PlayerCamera.cs`; call `SetViewportForPlayer(1)` / `SetViewportForPlayer(2)` (e.g. from a small bootstrap script or the Inspector)
-   - A `Canvas` with five child panels, each with its matching `UI/*.cs` script (`LobbyUI`, `ImageUploadUI`, `GenerationUI`, `RaceHUD`, `ResultsUI`)
-5. Wire the public/`[SerializeField]` references between these objects in the
-   Inspector (e.g. `GameManager.recipeClient`, `GameManager.meshAssetClient`,
-   `GameManager.worldGenerator`, `GameManager.raceManager`,
-   `GameManager.resultsUI`, `GeneratedMeshLoader.client` → the
-   `MeshAssetClient`, each `PlayerController`'s `input`/`kart`, each
-   `RaceHUD`'s `player1Laps`/`player2Laps`). This is the step that
-   substitutes for pre-wired GUIDs.
-6. Add `Collider(isTrigger = true)` + `LapManager` components under each kart
-   so `Checkpoint.OnTriggerEnter` can find them via `GetComponentInParent`.
-7. Save the scene and commit the generated `.unity`, `.meta`, and
-   `Library/`-adjacent files that git is supposed to track (see
+4. Commit the generated `.unity`, `.mat`, and `.meta` files (see
    `.gitignore` — `Library/` itself is never committed).
 
-Nothing in this repository has been compiled or run inside the Unity Editor
-by this bootstrap — the scripts have been written and reviewed for syntax and
-consistency, but the above checklist is unverified until a human runs it.
+### What the builder produces
+
+Reference for what's in the scene (and what to recreate by hand if you'd
+rather not use the menu item). Field names are the actual `[SerializeField]`
+names, so the builder logs an error naming the field if a script renames one.
+
+| GameObject | Components | Wired references |
+|---|---|---|
+| `GameManager` | `Core/GameManager` (runs first via `DefaultExecutionOrder(-100)`) | `recipeClient`, `meshAssetClient`, `worldGenerator`, `raceManager`, `resultsUI` |
+| ↳ `Backend` | `AI/WorldRecipeClient`, `AI/MeshAssetClient` | — |
+| `WorldGenerator` | `World/WorldGenerator` | `environmentGenerator`, `trackVisualRoot`, `checkpointRoot`, `sunLight`, `groundRenderer` |
+| ↳ `EnvironmentGenerator` | `World/EnvironmentGenerator` **and** `Assets/GeneratedMeshLoader` on the same GameObject (not a child — `Generate()` destroys children) | `meshLoader` → self; `GeneratedMeshLoader.client` → `MeshAssetClient` |
+| ↳ `TrackVisual` | `LineRenderer` (flat, `Default-Line` material) | — |
+| ↳ `Checkpoints` | empty; `WorldGenerator` fills it at runtime with trigger gates facing the track tangent | — |
+| ↳ `Ground` | Plane ×30 at y = −0.05 | palette-tinted via `groundRenderer` |
+| `Directional Light` | `Light` | palette-tinted via `sunLight` |
+| `RaceManager` | `Racing/RaceManager` | `players` → both `LapManager`s |
+| `RaceBootstrap` | `Racing/RaceBootstrap` — the glue: on `WorldReady` parks the karts on the start line and starts the countdown, on `Racing` unfreezes them, sets split-screen viewports | `worldGenerator`, `raceManager`, `karts[2]`, `cameras[2]` |
+| `Kart_P1` / `Kart_P2` | Cube + `Rigidbody` + `Players/KartController` + `Players/PlayerController` + `Input/PlayerInput` (WASD / arrows) + `Racing/LapManager` | `rb`, `input`, `kart`, `playerIndex` |
+| `Camera_P1` / `Camera_P2` | `Camera` (top / bottom half) + `Camera/PlayerCamera`; `AudioListener` on P1 only | `cam`, `target` |
+| `Canvas` | Screen-space overlay, 1920×1080 scaler | — |
+| ↳ `LobbyPanel` … `ResultsPanel` | one legacy-UI panel per `UI/*.cs` script (`LobbyUI`, `ImageUploadUI`, `GenerationUI`, `RaceHUD`, `ResultsUI`) | `panel`, buttons, texts, `RaceHUD.player1Laps/player2Laps` |
+| `EventSystem` | `EventSystem` + `StandaloneInputModule` (old Input Manager) | — |
+
+The UI scripts use legacy `UnityEngine.UI.Text` / `InputField`, so if you
+add UI by hand use GameObject → UI → **Legacy**, not the TextMeshPro
+variants.
 
 ## Manual determinism check (until an Editor is available)
 
