@@ -36,6 +36,10 @@ namespace MarioKart.Players
         [Tooltip("Fraction of collision-induced spin that survives the moment of impact.")]
         [Range(0f, 1f)] public float barrierHitSpinKeep = 0.2f;
 
+        [Header("Skid")]
+        [Tooltip("Grip multiplier while skidding (after hitting a wall or the other kart). Lower = longer slide.")]
+        [Range(0f, 1f)] public float skidGripFactor = 0.15f;
+
         [Header("Spin control")]
         [Tooltip("How fast physics-induced spin (from walls / the other kart) is bled off, per second. Higher = stops sooner.")]
         public float spinDamping = 12f;
@@ -45,6 +49,9 @@ namespace MarioKart.Players
         private KartInput currentInput;
         private PhysicsMaterial frictionless;
         private float scrapingUntil; // Time.time until which the scrape cap applies
+        private float skidUntil;     // Time.time until which grip is reduced
+
+        public bool IsSkidding => Time.time < skidUntil;
 
         public float ForwardSpeed { get; private set; }
 
@@ -77,6 +84,15 @@ namespace MarioKart.Players
             currentInput = input;
         }
 
+        /// <summary>
+        /// Drop grip for a while so the kart slides instead of snapping back
+        /// in line. Called by KartSkidEffect on any solid contact.
+        /// </summary>
+        public void StartSkid(float seconds)
+        {
+            skidUntil = Mathf.Max(skidUntil, Time.time + seconds);
+        }
+
         /// <summary>Called by TrackBarrier on first contact with a wall.</summary>
         public void OnBarrierHit()
         {
@@ -96,7 +112,11 @@ namespace MarioKart.Players
 
         private void FixedUpdate()
         {
-            if (rb.isKinematic) return; // frozen by RaceBootstrap (lobby / countdown / results)
+            if (rb.isKinematic) // frozen by RaceBootstrap (lobby / countdown / results)
+            {
+                ForwardSpeed = 0f;
+                return;
+            }
 
             float dt = Time.fixedDeltaTime;
             Vector3 velocity = rb.linearVelocity;
@@ -142,7 +162,8 @@ namespace MarioKart.Players
             }
 
             // ---- Lateral grip: bleed off sideways slide ----
-            lateralSpeed = Mathf.MoveTowards(lateralSpeed, 0f, grip * Mathf.Abs(lateralSpeed) * dt + 0.5f * dt);
+            float effectiveGrip = IsSkidding ? grip * skidGripFactor : grip;
+            lateralSpeed = Mathf.MoveTowards(lateralSpeed, 0f, effectiveGrip * Mathf.Abs(lateralSpeed) * dt + 0.5f * dt);
 
             ForwardSpeed = forwardSpeed;
             rb.linearVelocity = forward * forwardSpeed + right * lateralSpeed + Vector3.up * velocity.y;

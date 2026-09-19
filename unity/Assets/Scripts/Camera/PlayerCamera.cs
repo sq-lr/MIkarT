@@ -11,7 +11,10 @@ namespace MarioKart.CameraSystem
     {
         [SerializeField] private Camera cam;
         [SerializeField] private Transform target;
-        public Vector3 offset = new Vector3(0f, 4f, -8f);
+        [Tooltip("Camera position relative to the kart (local space): x right, y up, z back.")]
+        public Vector3 offset = new Vector3(0f, 4f, -5.5f);
+        [Tooltip("Point the camera aims at, relative to the kart. Ahead and slightly up keeps the horizon in view.")]
+        public Vector3 lookOffset = new Vector3(0f, 0f, 6f);
         public float followLerp = 8f;
 
         private void Awake()
@@ -41,7 +44,8 @@ namespace MarioKart.CameraSystem
             Vector3 desiredPosition = target.TransformPoint(offset);
             transform.position = Vector3.Lerp(transform.position, desiredPosition, followLerp * Time.deltaTime);
 
-            Quaternion desiredRotation = Quaternion.LookRotation(target.position - transform.position, Vector3.up);
+            Vector3 lookTarget = target.TransformPoint(lookOffset);
+            Quaternion desiredRotation = Quaternion.LookRotation(lookTarget - transform.position, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, desiredRotation, followLerp * Time.deltaTime);
         }
     }

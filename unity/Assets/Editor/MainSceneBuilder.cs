@@ -226,6 +226,8 @@ namespace MarioKart.EditorTools
             var player = kart.AddComponent<PlayerController>();
             var laps = kart.AddComponent<LapManager>();
             laps.playerIndex = playerIndex;
+            kart.AddComponent<KartSpeedEffect>(); // builds its own particle systems at runtime
+            kart.AddComponent<KartSkidEffect>();  // likewise: smoke, sparks, skid marks
 
             Set(controller, "rb", rb);
             Set(player, "input", input);
@@ -253,9 +255,13 @@ namespace MarioKart.EditorTools
             cam.rect = playerIndex == 1 ? new Rect(0f, 0.5f, 1f, 0.5f) : new Rect(0f, 0f, 1f, 0.5f);
             cam.depth = playerIndex;
 
+            // Raised chase cam: well above the kart and a few metres back,
+            // aimed at the road ahead so it looks down at the kart *and* forward.
             var follow = go.GetComponent<PlayerCamera>();
+            follow.offset = new Vector3(0f, 4f, -5.5f);
+            follow.lookOffset = new Vector3(0f, 0f, 6f);
             go.transform.position = target.TransformPoint(follow.offset);
-            go.transform.LookAt(target);
+            go.transform.LookAt(target.TransformPoint(follow.lookOffset));
 
             Set(follow, "cam", cam);
             Set(follow, "target", target);
