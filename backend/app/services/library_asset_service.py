@@ -14,7 +14,10 @@ Two implementations ship:
   simply dropped (they were never essential -- the world is already complete
   without them). Needs no key or network.
 - PolyPizzaLibraryAssetService (LIBRARY_PROVIDER=polypizza): Poly Pizza's
-  keyword search (https://poly.pizza/docs/api/v1.1).
+  keyword search (https://poly.pizza/docs/api/v1.1). A search returns a page
+  of loosely-ranked candidates, not one exact hit, so picking which one (if
+  any) to use is delegated to a MatchPickerService (see
+  app.services.match_picker_service) rather than done here.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ import httpx
 from pydantic import BaseModel
 
 from app.services.filler_asset_service import FillerAsset
+from app.services.match_picker_service import HeuristicMatchPickerService, MatchCandidate, MatchPickerService
 from app.services.mesh_generation_service import MeshTask, MeshTaskStatus
 
 logger = logging.getLogger(__name__)
@@ -71,28 +75,8 @@ class _SearchResult(BaseModel):
     ID: str
     Title: str
     Download: str
-
-
-def _best_match(keyword: str, results: list[dict]) -> dict | None:
-    """Pick the first result whose Title actually relates to the keyword.
-
-    Poly Pizza's ranking is loose full-text search, not exact keyword
-    matching -- its own #1 result for "trash_can" was "Debris Papers" (a
-    scrap of paper) and for "street_lamp" was "Road Bits" (unrelated), while
-    real matches ("Trash Can", "Streetlight") sat lower in the same page.
-    Blindly taking results[0] silently attaches the wrong mesh. Instead,
-    scan the page (32 results by default -- enough in practice; a real match
-    for "street_lamp" showed up at position 13) for the first title
-    containing any of the keyword's words as a substring (so "street" also
-    matches the compound title "Streetlight"). No match anywhere in the page
-    means no confident match at all -- treated the same as zero results.
-    """
-    keyword_words = [w for w in keyword.lower().replace("_", " ").split() if w]
-    for result in results:
-        title_lower = result["Title"].lower()
-        if any(word in title_lower for word in keyword_words):
-            return result
-    return None
+    Tags: list[str] = []
+    Category: str | None = None
 
 
 class PolyPizzaLibraryAssetService(LibraryAssetService):
@@ -101,7 +85,8 @@ class PolyPizzaLibraryAssetService(LibraryAssetService):
     returns, so Unity's glTFast import path is unchanged.
 
     submit  -> GET /search/{keyword}, pick the best-matching result (see
-               _best_match), resolve (but don't yet download) its GLB url
+               a MatchPickerService), resolve (but don't yet download) its
+               GLB url
     status  -> always "ready" once submitted: the search already happened,
                there's no generation job to poll
     fetch   -> download the resolved GLB url, cached in-process so Unity's
@@ -114,6 +99,7 @@ class PolyPizzaLibraryAssetService(LibraryAssetService):
         base_url: str = POLY_PIZZA_BASE_URL,
         transport: httpx.BaseTransport | None = None,
         timeout: float = 15.0,
+        match_picker: MatchPickerService | None = None,
     ):
         if not api_key:
             raise ValueError("POLYPIZZA_API_KEY is required for LIBRARY_PROVIDER=polypizza")
@@ -123,6 +109,7 @@ class PolyPizzaLibraryAssetService(LibraryAssetService):
             timeout=timeout,
             transport=transport,
         )
+        self._match_picker = match_picker or HeuristicMatchPickerService()
         self._download_urls: dict[str, str] = {}
         self._model_cache: dict[str, bytes] = {}
         self._lock = threading.Lock()
@@ -132,12 +119,17 @@ class PolyPizzaLibraryAssetService(LibraryAssetService):
         response.raise_for_status()
         body = response.json()
         results = body.get("results") or []
-        best = _best_match(asset.keyword, results)
-        if best is None:
+        results_by_id = {r["ID"]: r for r in results}
+        candidates = [
+            MatchCandidate(id=r["ID"], title=r["Title"], tags=r.get("Tags") or [], category=r.get("Category"))
+            for r in results
+        ]
+        chosen_id = self._match_picker.pick(asset.keyword, candidates)
+        if chosen_id is None or chosen_id not in results_by_id:
             logger.info("poly pizza: no confident match for keyword %r (%d raw results)", asset.keyword, len(results))
             return None
 
-        result = _SearchResult.model_validate(best)
+        result = _SearchResult.model_validate(results_by_id[chosen_id])
         with self._lock:
             self._download_urls[result.ID] = result.Download
         logger.info("poly pizza: matched %r -> model %s (%r)", asset.keyword, result.ID, result.Title)

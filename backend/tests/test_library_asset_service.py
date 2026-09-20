@@ -5,6 +5,7 @@ import pytest
 
 from app.services.filler_asset_service import FillerAsset
 from app.services.library_asset_service import MockLibraryAssetService, PolyPizzaLibraryAssetService
+from app.services.match_picker_service import MatchCandidate, MatchPickerService
 
 GLB_BYTES = b"glTF\x02\x00\x00\x00fake"
 
@@ -94,6 +95,24 @@ def test_submit_matches_compound_title_by_substring(poly_pizza):
     assert task.task_id == "right-1"
 
 
+def test_submit_prefers_two_word_match_over_earlier_one_word_match(poly_pizza):
+    # Real bug seen live: for keyword "bicycle_rack", "Bicycle" (matches only
+    # "bicycle") appeared before "Bike Rack" -- but a title matching BOTH
+    # keyword words should win even if it comes later on the page.
+    fake, service = poly_pizza
+    fake.results = [
+        {"ID": "wrong-1", "Title": "Bicycle", "Download": "https://cdn.example/wrong.glb"},
+        {"ID": "wrong-2", "Title": "Coat Rack", "Download": "https://cdn.example/wrong2.glb"},
+        {"ID": "right-1", "Title": "Bicycle Rack", "Download": "https://cdn.example/model.glb"},
+    ]
+    asset = FillerAsset(keyword="bicycle_rack", density=0.4, placement="scattered")
+
+    task = service.submit(asset)
+
+    assert task is not None
+    assert task.task_id == "right-1"
+
+
 def test_submit_returns_none_when_nothing_on_the_page_relates_to_keyword(poly_pizza):
     fake, service = poly_pizza
     fake.results = [
@@ -134,6 +153,41 @@ def test_fetch_model_downloads_and_caches(poly_pizza):
 def test_fetch_model_unknown_task_returns_none(poly_pizza):
     _, service = poly_pizza
     assert service.fetch_model("nope") is None
+
+
+class _RecordingMatchPicker(MatchPickerService):
+    """Fake match picker that records what it was asked and always chooses
+    the LAST candidate -- i.e. the opposite of the heuristic default, so a
+    passing test proves submit() actually delegates instead of always using
+    HeuristicMatchPickerService."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, list[MatchCandidate]]] = []
+
+    def pick(self, keyword, candidates):
+        self.calls.append((keyword, candidates))
+        return candidates[-1].id if candidates else None
+
+
+def test_submit_uses_the_injected_match_picker_and_passes_tags_and_category():
+    fake = FakePolyPizza()
+    fake.results = [
+        {"ID": "wrong-1", "Title": "Bicycle", "Tags": ["bike"], "Category": "vehicle", "Download": "https://cdn.example/wrong.glb"},
+        {"ID": "right-1", "Title": "Bike Rack", "Tags": ["rack", "bicycle"], "Category": "furniture", "Download": "https://cdn.example/model.glb"},
+    ]
+    picker = _RecordingMatchPicker()
+    service = PolyPizzaLibraryAssetService(api_key="secret", transport=httpx.MockTransport(fake.handler), match_picker=picker)
+    asset = FillerAsset(keyword="bicycle_rack", density=0.4, placement="scattered")
+
+    task = service.submit(asset)
+
+    assert task is not None
+    assert task.task_id == "right-1"  # picker's choice (last candidate), not the heuristic's
+    keyword, candidates = picker.calls[0]
+    assert keyword == "bicycle_rack"
+    assert [c.title for c in candidates] == ["Bicycle", "Bike Rack"]
+    assert candidates[1].tags == ["rack", "bicycle"]
+    assert candidates[1].category == "furniture"
 
 
 def test_mock_library_finds_nothing_no_network():

@@ -1,0 +1,122 @@
+[
+  {
+    "keyword": "statue",
+    "placement": "landmark",
+    "found": true,
+    "task_id": "AK9CmjFnL6",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 119712,
+    "file": "meshes-retrieved-only/statue.glb"
+  },
+  {
+    "keyword": "bare_tree",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "etFGNvsiFv",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 3408276,
+    "file": "meshes-retrieved-only/bare_tree.glb"
+  },
+  {
+    "keyword": "street_lamp",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "vPFSLYh6sg",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 29148,
+    "file": "meshes-retrieved-only/street_lamp.glb"
+  },
+  {
+    "keyword": "park_bench",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "3ytbP2GLb0b",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 34660,
+    "file": "meshes-retrieved-only/park_bench.glb"
+  },
+  {
+    "keyword": "bollard",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "JSQJ07PFj2",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 369932,
+    "file": "meshes-retrieved-only/bollard.glb"
+  },
+  {
+    "keyword": "trash_can",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "PEtRDeGyg0",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 11816,
+    "file": "meshes-retrieved-only/trash_can.glb"
+  },
+  {
+    "keyword": "bicycle",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "19VoUuA2pcN",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 2394132,
+    "file": "meshes-retrieved-only/bicycle.glb"
+  },
+  {
+    "keyword": "bush",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "d6STyhH76Qe",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 29880,
+    "file": "meshes-retrieved-only/bush.glb"
+  },
+  {
+    "keyword": "sign",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "mxyDWLsKer",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 26908,
+    "file": "meshes-retrieved-only/sign.glb"
+  },
+  {
+    "keyword": "planter",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "wn85Xr9lM3",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 53232,
+    "file": "meshes-retrieved-only/planter.glb"
+  },
+  {
+    "keyword": "building",
+    "placement": "background",
+    "found": true,
+    "task_id": "01lqee-dZAr",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 1213848,
+    "file": "meshes-retrieved-only/building.glb"
+  },
+  {
+    "keyword": "tower",
+    "placement": "background",
+    "found": true,
+    "task_id": "iuMDwgTRMU",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 114648,
+    "file": "meshes-retrieved-only/tower.glb"
+  }
+]

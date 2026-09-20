@@ -56,5 +56,48 @@
   <div class="card"><model-viewer src="meshes-retrieved/picnic_table.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">picnic_table</div></div>
 </div>
 
+<h2>Stage 6 (personalize=false, retrieval-only + photo-aware landmarks) — meshes-retrieved-only/</h2>
+<p style="color:#999; font-size:13px; margin-top:-8px;">Entire world sourced from one Claude filler call (max_landmarks=2) + Poly Pizza — no Meshy at all. "statue" is a generic translation of what's actually in the photo (the wire-mesh sculpture); everything else is round-out filler. Only 1 landmark this run — Claude correctly declined to invent a second one, and every keyword is now a single concept (no more "clock_tower"/"bicycle_rack" compound nouns matching the wrong object). See docs/decisions/0010-personalize-toggle.md.</p>
+<div class="grid">
+  <div class="card"><model-viewer src="meshes-retrieved-only/statue.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">statue (landmark — from the actual sculpture)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/bare_tree.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bare_tree (from the actual tree)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/street_lamp.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">street_lamp</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/park_bench.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">park_bench</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/bollard.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bollard</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/trash_can.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">trash_can</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/bicycle.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bicycle (was "bicycle_rack" — fixed, now single-concept)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/bush.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bush</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/sign.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">sign</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/planter.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">planter</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/building.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">building</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only/tower.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">tower (was "clock_tower" — fixed, now single-concept)</div></div>
+</div>
+
+<h2>Stage 7 (heuristic vs. Claude match picker) — meshes-match-picker/</h2>
+<p style="color:#999; font-size:13px; margin-top:-8px;">Same keyword, same live Poly Pizza search results, two different pickers (see docs/decisions/0011-claude-match-picker.md). The heuristic can only match candidates sharing a literal word with the keyword; Claude picks semantically. "clock_tower" has no real "Clock Tower" listing at all — the heuristic falls back to a desk clock, Claude correctly picks a Bell Tower. "bicycle_rack" has no listing containing the word "bicycle" — the heuristic falls back to a bare bicycle, Claude correctly picks a Bike Rack.</p>
+<div class="grid">
+  <div class="card"><model-viewer src="meshes-match-picker/heuristic-clock_tower.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">clock_tower — heuristic picker ("Analog clock", wrong)</div></div>
+  <div class="card"><model-viewer src="meshes-match-picker/claude-clock_tower.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">clock_tower — Claude picker ("Bell Tower", correct)</div></div>
+  <div class="card"><model-viewer src="meshes-match-picker/heuristic-bicycle_rack.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bicycle_rack — heuristic picker ("Bicycle", wrong)</div></div>
+  <div class="card"><model-viewer src="meshes-match-picker/claude-bicycle_rack.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bicycle_rack — Claude picker ("Bike Rack", correct)</div></div>
+</div>
+
+<h2>Stage 8 (personalize=false, ALL 12 objects retrieved via Claude match picker) — meshes-retrieved-only-claude-matcher/</h2>
+<p style="color:#999; font-size:13px; margin-top:-8px;">Same pipeline as Stage 6 (ClaudeFillerAssetService.suggest(max_landmarks=2), no Meshy at all), but every one of the 12 keywords was resolved via ClaudeMatchPickerService (MATCH_PICKER_PROVIDER=claude) instead of the free heuristic — one extra Claude call per keyword, semantically picking the best Poly Pizza result instead of scoring word overlap. All 12/12 matched. See docs/decisions/0011-claude-match-picker.md.</p>
+<div class="grid">
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/statue.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">statue (landmark)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/building.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">building (background)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/tree.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">tree (roadside)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/park_bench.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">park_bench (roadside)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/street_lamp.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">street_lamp (roadside)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/trash_can.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">trash_can (roadside)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/bicycle.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bicycle (scattered)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/bulletin_board.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bulletin_board (scattered)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/bush.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bush (scattered)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/planter.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">planter (scattered)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/bollard.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bollard (roadside)</div></div>
+  <div class="card"><model-viewer src="meshes-retrieved-only-claude-matcher/picnic_table.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">picnic_table (scattered)</div></div>
+</div>
+
 </body>
 </html>

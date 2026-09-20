@@ -1,0 +1,134 @@
+[
+  {
+    "keyword": "statue",
+    "placement": "landmark",
+    "found": true,
+    "task_id": "AK9CmjFnL6",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 119712,
+    "file": "meshes-retrieved-only-claude-matcher/statue.glb"
+  },
+  {
+    "keyword": "building",
+    "placement": "background",
+    "found": true,
+    "task_id": "qOhhGLftam",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 106980,
+    "file": "meshes-retrieved-only-claude-matcher/building.glb"
+  },
+  {
+    "keyword": "tree",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "dNWh762PN-6",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 3407832,
+    "file": "meshes-retrieved-only-claude-matcher/tree.glb"
+  },
+  {
+    "keyword": "park_bench",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "kn0sMwbspb",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 30780,
+    "file": "meshes-retrieved-only-claude-matcher/park_bench.glb"
+  },
+  {
+    "keyword": "street_lamp",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "nFwrlcLvM5",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 11056,
+    "file": "meshes-retrieved-only-claude-matcher/street_lamp.glb"
+  },
+  {
+    "keyword": "trash_can",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "PEtRDeGyg0",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 11816,
+    "file": "meshes-retrieved-only-claude-matcher/trash_can.glb"
+  },
+  {
+    "keyword": "bicycle",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "19VoUuA2pcN",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 2394132,
+    "file": "meshes-retrieved-only-claude-matcher/bicycle.glb"
+  },
+  {
+    "keyword": "bulletin_board",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "9x50CBKNzPq",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 6680,
+    "file": "meshes-retrieved-only-claude-matcher/bulletin_board.glb"
+  },
+  {
+    "keyword": "bush",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "d6STyhH76Qe",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 29880,
+    "file": "meshes-retrieved-only-claude-matcher/bush.glb"
+  },
+  {
+    "keyword": "planter",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "wn85Xr9lM3",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 53232,
+    "file": "meshes-retrieved-only-claude-matcher/planter.glb"
+  },
+  {
+    "keyword": "bollard",
+    "placement": "roadside",
+    "found": true,
+    "task_id": "JSQJ07PFj2",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 369932,
+    "file": "meshes-retrieved-only-claude-matcher/bollard.glb"
+  },
+  {
+    "keyword": "picnic_table",
+    "placement": "scattered",
+    "found": true,
+    "task_id": "8cnrwlAWqx7",
+    "provider": "polypizza",
+    "match_picker": "claude",
+    "status": "ready",
+    "bytes": 7484,
+    "file": "meshes-retrieved-only-claude-matcher/picnic_table.glb"
+  }
+]

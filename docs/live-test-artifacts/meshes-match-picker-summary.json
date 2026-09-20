@@ -1,0 +1,34 @@
+[
+  {
+    "picker": "heuristic",
+    "keyword": "clock_tower",
+    "found": true,
+    "task_id": "5gAoMR2YHs3",
+    "file": "meshes-match-picker/heuristic-clock_tower.glb",
+    "bytes": 13656
+  },
+  {
+    "picker": "heuristic",
+    "keyword": "bicycle_rack",
+    "found": true,
+    "task_id": "19VoUuA2pcN",
+    "file": "meshes-match-picker/heuristic-bicycle_rack.glb",
+    "bytes": 2394132
+  },
+  {
+    "picker": "claude",
+    "keyword": "clock_tower",
+    "found": true,
+    "task_id": "ux44tbeQvj",
+    "file": "meshes-match-picker/claude-clock_tower.glb",
+    "bytes": 728440
+  },
+  {
+    "picker": "claude",
+    "keyword": "bicycle_rack",
+    "found": true,
+    "task_id": "DzsJ2LPVKZ",
+    "file": "meshes-match-picker/claude-bicycle_rack.glb",
+    "bytes": 399196
+  }
+]

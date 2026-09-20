@@ -62,7 +62,44 @@ def test_claude_suggest_raises_on_refusal():
         service.suggest(make_png(), "x")
 
 
-def test_filler_asset_placement_excludes_landmark():
-    with pytest.raises(ValueError):
-        FillerAsset(keyword="x", density=0.5, placement="landmark")
-    FillerAsset(keyword="x", density=0.5, placement="roadside")  # doesn't raise
+def test_filler_asset_placement_allows_all_four_values():
+    # The model itself allows "landmark" -- the "never unless max_landmarks
+    # says otherwise" rule is enforced by ClaudeFillerAssetService.suggest()
+    # (prompt + demotion), not by the Pydantic field type. See
+    # docs/decisions/0010-personalize-toggle.md.
+    for placement in ("landmark", "roadside", "background", "scattered"):
+        FillerAsset(keyword="x", density=0.5, placement=placement)
+
+
+def test_claude_suggest_demotes_landmarks_beyond_max_landmarks():
+    extraction = FillerAssetExtraction(
+        filler_assets=[
+            FillerAsset(keyword="lighthouse", density=0.15, placement="landmark"),
+            FillerAsset(keyword="fountain", density=0.15, placement="landmark"),
+            FillerAsset(keyword="clock_tower", density=0.15, placement="landmark"),
+            FillerAsset(keyword="bench", density=0.5, placement="roadside"),
+        ]
+    )
+    client, _ = _stub_client(SimpleNamespace(stop_reason="end_turn", parsed_output=extraction))
+    service = ClaudeFillerAssetService(max_assets=4, client=client)
+
+    result = service.suggest(make_png(), "a fantasy kingdom", max_landmarks=2)
+
+    placements = {a.keyword: a.placement for a in result.filler_assets}
+    assert placements["lighthouse"] == "landmark"
+    assert placements["fountain"] == "landmark"
+    assert placements["clock_tower"] == "scattered"  # demoted -- only 2 allowed
+    assert placements["bench"] == "roadside"
+
+
+def test_claude_suggest_demotes_all_landmarks_when_max_landmarks_zero():
+    extraction = FillerAssetExtraction(
+        filler_assets=[FillerAsset(keyword="lighthouse", density=0.15, placement="landmark")]
+    )
+    client, messages = _stub_client(SimpleNamespace(stop_reason="end_turn", parsed_output=extraction))
+    service = ClaudeFillerAssetService(max_assets=4, client=client)
+
+    result = service.suggest(make_png(), "a beach")  # max_landmarks defaults to 0
+
+    assert result.filler_assets[0].placement == "scattered"
+    assert "Never" in messages.calls[0]["system"]  # the max_landmarks=0 prompt variant

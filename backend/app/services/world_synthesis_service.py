@@ -54,6 +54,7 @@ class WorldSynthesisService(ABC):
         filler_mesh_tasks: list[MeshTask] | None = None,
         sky: str = "sunny",
         max_assets: int = _SCHEMA_MAX_RECIPE_OBJECTS,
+        personalize: bool = True,
     ) -> WorldRecipe:
         """`mesh_tasks` are the in-flight mesh generations for this world, one
         per detected object type that was successfully submitted; each becomes
@@ -66,7 +67,14 @@ class WorldSynthesisService(ABC):
         library lookups for those that were actually found -- a filler asset
         with no match is dropped entirely rather than kept without one.
         `max_assets` is the configured overall cap (providers.max_assets_per_world),
-        clamped to the schema's hard ceiling."""
+        clamped to the schema's hard ceiling. `personalize` gates whether
+        `scene.detected_objects`/`text_assets` contribute objects at all: when
+        False (the "generate personalized assets" toggle is off), the whole
+        world is sourced from `filler_assets`/`filler_mesh_tasks` alone, which
+        by convention were requested with landmarks allowed in that case (see
+        docs/decisions/0010-personalize-toggle.md) -- `mesh_tasks`/`text_mesh_tasks`
+        should be empty when `personalize` is False, since nothing should have
+        been submitted to Meshy."""
         raise NotImplementedError
 
 
@@ -231,6 +239,7 @@ def _objects_from_filler_assets(
     filler_assets: list[FillerAsset],
     filler_mesh_tasks: list[MeshTask],
     taken_labels: set[str],
+    landmark_count: int = 0,
 ) -> list[WorldObjectEntry]:
     """One entry per filler keyword that was actually found in the library.
 
@@ -239,9 +248,14 @@ def _objects_from_filler_assets(
     real library mesh, so a bare placeholder with a random generic keyword
     adds nothing a photo/text object placeholder wouldn't already. Skips any
     label already claimed by a photo- or text-derived object, same collision
-    rule as text vs. photo. Placement is never "landmark" here -- filler_assets
-    is restricted to that vocabulary upstream (FillerPlacement), so nothing to
-    demote/count against MAX_LANDMARKS.
+    rule as text vs. photo.
+
+    `landmark_count` is how many landmarks photo/text sources already used.
+    Filler's placement is normally restricted to non-"landmark" values by its
+    own prompt (see app.services.filler_asset_service), but when the
+    "generate personalized assets" toggle is off (docs/decisions/0010) it may
+    be asked for 1-2, so the same demotion logic as the other two sources
+    applies here too, so Unity never sees more than MAX_LANDMARKS total.
     """
     task_by_label = {task.object_type: task for task in filler_mesh_tasks}
     entries: list[WorldObjectEntry] = []
@@ -254,11 +268,20 @@ def _objects_from_filler_assets(
         if task is None:
             continue  # no library match for this keyword -- nothing to add
         seen.add(asset.keyword)
+
+        placement = asset.placement
+        if placement == "landmark":
+            if landmark_count >= MAX_LANDMARKS:
+                logger.debug("demoting filler landmark %r to %s", asset.keyword, DEFAULT_PLACEMENT)
+                placement = DEFAULT_PLACEMENT
+            else:
+                landmark_count += 1
+
         entries.append(
             WorldObjectEntry(
                 type=asset.keyword,
                 density=asset.density,
-                placement=asset.placement,
+                placement=placement,
                 asset=ObjectAsset(task_id=task.task_id, provider=task.provider),
             )
         )
@@ -280,23 +303,31 @@ class MockWorldSynthesisService(WorldSynthesisService):
         filler_mesh_tasks: list[MeshTask] | None = None,
         sky: str = "sunny",
         max_assets: int = _SCHEMA_MAX_RECIPE_OBJECTS,
+        personalize: bool = True,
     ) -> WorldRecipe:
         max_assets = min(max_assets, _SCHEMA_MAX_RECIPE_OBJECTS)
         profile_key = _pick_profile_key(scene, description)
         profile = _THEME_PROFILES[profile_key]
         seed = derive_seed(description, profile_key, "".join(scene.dominant_colors))
 
-        photo_objects = _objects_from_scene(scene, mesh_tasks or [])
-        text_objects = _objects_from_text_assets(
-            text_assets or [],
-            text_mesh_tasks or [],
-            {o.type for o in photo_objects},
-            landmark_count=sum(1 for o in photo_objects if o.placement == "landmark"),
-        )
+        if personalize:
+            photo_objects = _objects_from_scene(scene, mesh_tasks or [])
+            text_objects = _objects_from_text_assets(
+                text_assets or [],
+                text_mesh_tasks or [],
+                {o.type for o in photo_objects},
+                landmark_count=sum(1 for o in photo_objects if o.placement == "landmark"),
+            )
+        else:
+            # Personalization off: the whole world comes from filler/library
+            # retrieval instead -- see docs/decisions/0010-personalize-toggle.md.
+            photo_objects = []
+            text_objects = []
         filler_objects = _objects_from_filler_assets(
             filler_assets or [],
             filler_mesh_tasks or [],
             {o.type for o in photo_objects} | {o.type for o in text_objects},
+            landmark_count=sum(1 for o in photo_objects + text_objects if o.placement == "landmark"),
         )
         objects = photo_objects + text_objects + filler_objects
         if not objects:

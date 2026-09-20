@@ -359,8 +359,9 @@ namespace MarioKart.EditorTools
             var cloudy = CreateSkyToggle(skyGroup.transform, "Cloudy", "Cloudy Sky", font, new Vector2(-95f, 0f));
             var sunset = CreateSkyToggle(skyGroup.transform, "Sunset", "Sunset Sky", font, new Vector2(95f, 0f));
             var night = CreateSkyToggle(skyGroup.transform, "Night", "Night Sky", font, new Vector2(285f, 0f));
+            var personalize = CreatePersonalizeToggle(panel.transform, font, new Vector2(0f, -410f));
             var generate = CreateButton(panel.transform, "GenerateButton", "Generate World", font, new Vector2(0f, -310f), new Vector2(320f, 80f));
-            generate.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -450f);
+            generate.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -470f);
 
             var ui = holder.AddComponent<ImageUploadUI>();
             Set(ui, "panel", panel);
@@ -372,8 +373,56 @@ namespace MarioKart.EditorTools
             Set(ui, "sunsetSkyToggle", sunset);
             Set(ui, "nightSkyToggle", night);
             Set(ui, "skyToggleGroup", skyGroup);
+            Set(ui, "personalizeToggle", personalize);
             Set(ui, "generateButton", generate);
             return ui;
+        }
+
+        private static Toggle CreatePersonalizeToggle(Transform parent, Font font, Vector2 position)
+        {
+            // Off by default: fast/free retrieval-only world unless the
+            // player opts into slower, personalized Meshy generation. See
+            // docs/decisions/0010-personalize-toggle.md.
+            var go = new GameObject("PersonalizeToggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
+            go.transform.SetParent(parent, false);
+            SetRect(go.GetComponent<RectTransform>(), Center, position, new Vector2(340f, 42f));
+
+            var background = go.GetComponent<Image>();
+            background.color = new Color(0.16f, 0.16f, 0.16f, 0.95f);
+            var toggle = go.GetComponent<Toggle>();
+            toggle.targetGraphic = background;
+            toggle.isOn = false;
+            toggle.colors = new ColorBlock
+            {
+                normalColor = new Color(0.16f, 0.16f, 0.16f),
+                highlightedColor = new Color(0.30f, 0.50f, 0.80f),
+                pressedColor = new Color(0.20f, 0.40f, 0.70f),
+                selectedColor = new Color(0.25f, 0.65f, 0.35f),
+                disabledColor = new Color(0.10f, 0.10f, 0.10f),
+                colorMultiplier = 1f,
+                fadeDuration = 0.1f,
+            };
+
+            var check = new GameObject("Checkmark", typeof(RectTransform), typeof(Image));
+            check.transform.SetParent(go.transform, false);
+            var checkRect = check.GetComponent<RectTransform>();
+            checkRect.anchorMin = new Vector2(0f, 0.5f);
+            checkRect.anchorMax = new Vector2(0f, 0.5f);
+            checkRect.pivot = new Vector2(0f, 0.5f);
+            checkRect.anchoredPosition = new Vector2(8f, 0f);
+            checkRect.sizeDelta = new Vector2(26f, 26f);
+            check.GetComponent<Image>().color = new Color(0.55f, 0.72f, 0.20f);
+            toggle.graphic = check.GetComponent<Image>();
+
+            var text = CreateText(go.transform, "Label", "Generate personalized assets", font, 20, Center, Vector2.zero, new Vector2(340f, 42f), TextAnchor.MiddleLeft);
+            text.color = Color.white;
+            var textRect = text.rectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(42f, 0f);
+            textRect.offsetMax = Vector2.zero;
+
+            return toggle;
         }
 
         private static Toggle CreateSkyToggle(Transform parent, string name, string label, Font font, Vector2 position)

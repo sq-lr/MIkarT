@@ -1,10 +1,13 @@
 """Env-driven wiring of the AI/mesh/library providers.
 
-    AI_PROVIDER            mock (default) | claude     -> VisionService
-    MESH_PROVIDER          mock (default) | meshy       -> MeshGenerationService
-    TEXT_ASSET_PROVIDER    mock (default) | claude      -> TextAssetService
-    FILLER_ASSET_PROVIDER  mock (default) | claude      -> FillerAssetService
-    LIBRARY_PROVIDER       mock (default) | polypizza   -> LibraryAssetService
+    AI_PROVIDER            mock (default) | claude       -> VisionService
+    MESH_PROVIDER          mock (default) | meshy        -> MeshGenerationService
+    TEXT_ASSET_PROVIDER    mock (default) | claude       -> TextAssetService
+    FILLER_ASSET_PROVIDER  mock (default) | claude       -> FillerAssetService
+    LIBRARY_PROVIDER       mock (default) | polypizza    -> LibraryAssetService
+    MATCH_PICKER_PROVIDER  claude (default) | heuristic  -> MatchPickerService, used only by
+                                                             LIBRARY_PROVIDER=polypizza to pick
+                                                             which search result (if any) to use
 
 All default to mock so `pytest` and an offline demo need no keys. Selecting
 a real provider without its key fails fast at startup with a clear message
@@ -19,6 +22,7 @@ from dataclasses import dataclass
 
 from app.services.filler_asset_service import ClaudeFillerAssetService, FillerAssetService, MockFillerAssetService
 from app.services.library_asset_service import LibraryAssetService, MockLibraryAssetService, PolyPizzaLibraryAssetService
+from app.services.match_picker_service import ClaudeMatchPickerService, HeuristicMatchPickerService, MatchPickerService
 from app.services.mesh_generation_service import (
     MeshGenerationService,
     MeshTaskRegistry,
@@ -129,7 +133,18 @@ def build_from_env() -> Providers:
         api_key = os.environ.get("POLYPIZZA_API_KEY", "")
         if not api_key:
             raise RuntimeError("LIBRARY_PROVIDER=polypizza requires POLYPIZZA_API_KEY")
-        library = PolyPizzaLibraryAssetService(api_key=api_key)
+
+        match_picker_provider = os.environ.get("MATCH_PICKER_PROVIDER", "claude").strip().lower()
+        if match_picker_provider == "heuristic":
+            match_picker: MatchPickerService = HeuristicMatchPickerService()
+        elif match_picker_provider == "claude":
+            if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+                raise RuntimeError("MATCH_PICKER_PROVIDER=claude requires ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN)")
+            match_picker = ClaudeMatchPickerService()
+        else:
+            raise RuntimeError(f"unknown MATCH_PICKER_PROVIDER {match_picker_provider!r} (expected 'heuristic' or 'claude')")
+
+        library = PolyPizzaLibraryAssetService(api_key=api_key, match_picker=match_picker)
     else:
         raise RuntimeError(f"unknown LIBRARY_PROVIDER {library_provider!r} (expected 'mock' or 'polypizza')")
 
