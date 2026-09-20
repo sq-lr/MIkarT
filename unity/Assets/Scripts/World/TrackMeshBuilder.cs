@@ -219,8 +219,8 @@ namespace MarioKart.World
                 }
             }
 
-            CreateMeshObject(root, "CenterLine", dashes, paint, withCollider: false).isStatic = true;
-            CreateMeshObject(root, "EdgeLines", edges, paint, withCollider: false).isStatic = true;
+            CreateMeshObject(root, "CenterLine", dashes, paint, withCollider: false, outline: false).isStatic = true;
+            CreateMeshObject(root, "EdgeLines", edges, paint, withCollider: false, outline: false).isStatic = true;
         }
 
         /// <summary>Red/white (or palette) kerbs along each wall, Mario Kart style.</summary>
@@ -254,8 +254,8 @@ namespace MarioKart.World
                 }
             }
 
-            CreateMeshObject(root, "Curb_A", a, white, withCollider: false).isStatic = true;
-            CreateMeshObject(root, "Curb_B", b, accent, withCollider: false).isStatic = true;
+            CreateMeshObject(root, "Curb_A", a, white, withCollider: false, outline: false).isStatic = true;
+            CreateMeshObject(root, "Curb_B", b, accent, withCollider: false, outline: false).isStatic = true;
         }
 
         /// <summary>
@@ -291,7 +291,7 @@ namespace MarioKart.World
             go.AddComponent<TrackBarrier>();
         }
 
-        private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider, bool outline)
+        private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider, bool outline = true)
         {
             // Vertices are in world space, so the object must sit at world
             // identity no matter how the root happens to be transformed.
