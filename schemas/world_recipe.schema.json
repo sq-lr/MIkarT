@@ -47,7 +47,7 @@
           "enum": ["day", "night", "dusk", "dawn"]
         },
         "sky": {
-          "description": "Selected race-sky presentation from the upload screen.",
+          "description": "The sky preset the player picked on the upload screen (the `sky` form field of POST /generate-world), echoed through unchanged -- not a model judgement. Unity builds a matching painterly skybox, fog, lighting and cloud cover; 'indoor' swaps the sky for a room around the track and makes the backend source the background wall from library 'wall' pieces. Defaults to 'sunny' for older recipes. Added backwards-compatibly (version stays 1).",
           "type": "string",
           "enum": ["sunny", "cloudy", "sunset", "night", "indoor"],
           "default": "sunny"
@@ -84,7 +84,7 @@
           "maximum": 1.0
         },
         "surface": {
-          "description": "Race-road surface selected from the uploaded image.",
+          "description": "The race-road surface the vision model judged most appropriate for the uploaded image (SceneUnderstanding.track_surface; canned by the mock). Unity blends the matching colour into the road. Defaults to 'concrete' for older recipes. Added backwards-compatibly (version stays 1).",
           "type": "string",
           "enum": ["concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"],
           "default": "concrete"
@@ -112,7 +112,7 @@
             "maximum": 1.0
           },
           "placement": {
-            "description": "How Unity should use this object, as judged by the vision model that saw the photo. 'landmark': the visual centrepiece (at most one per recipe) -- placed once or twice, oversized, at key points of the track. 'roadside': lines the road at intervals (lamp posts, fences, bollards). 'background': large distant skyline shapes (mountains, towers). 'scattered': natural clutter in groups (rocks, bushes, trees). Optional; absent means 'scattered'. Added backwards-compatibly (version stays 1).",
+            "description": "How Unity should use this object, as judged by the vision model that saw the photo. 'landmark': the visual centrepiece (at most two per recipe across all sources; the backend demotes extras) -- placed once or twice, oversized, at key points of the track. 'roadside': lines the road at intervals (lamp posts, fences, bollards). 'background': large distant skyline shapes (mountains, towers). 'scattered': natural clutter in groups (rocks, bushes, trees). Optional; absent means 'scattered'. Added backwards-compatibly (version stays 1).",
             "type": "string",
             "enum": ["landmark", "roadside", "background", "scattered"]
           },
@@ -142,7 +142,7 @@
       }
     },
     "palette": {
-      "description": "Ordered list of hex colors Unity applies to lighting/ground/skybox placeholders.",
+      "description": "Ordered list of hex colors: [0] sun/rim light, [1] ground (the filler extraction's theme ground colour when suggested), [2] accent (shadow band, barrier walls, indoor room walls, horizon haze). See docs/world-recipe.md.",
       "type": "array",
       "minItems": 1,
       "maxItems": 8,

@@ -17,22 +17,25 @@ world.
 
 ```
 One Image + One Text Description
+  (+ a sky preset and a "Generate personalized assets" toggle on the upload screen)
         ↓
 AI backend (FastAPI, mock by default)
-  VLM (Claude vision)      → scene info + mood + object bounding boxes
-  ObjectCropper            → one image crop per object
-  Text-asset extraction    → key props named in the description (Claude)
-  Filler-asset suggestion  → generic search keywords to diversify (Claude)
-  Meshy Image-to-3D        → one async mesh task per crop
-  Meshy Text-to-3D         → one async mesh task per extracted text asset
+  VLM (Claude vision)      → scene info + mood + track surface + object bounding boxes
+  ObjectCropper            → one image crop per object            (personalize only)
+  Text-asset extraction    → key props named in the description   (personalize only)
+  Filler-asset suggestion  → generic search keywords + a theme ground colour (Claude)
+  AssetMergeService        → final composition across all three   (personalize only)
+  Meshy Image-to-3D        → one async mesh task per crop          (personalize only)
+  Meshy Text-to-3D         → one async mesh task per text asset    (personalize only)
   Poly Pizza search        → one library lookup per filler keyword
         ↓
 WorldRecipe (versioned JSON contract — schemas/world_recipe.schema.json)
-  objects[].type = VLM label or text-extracted label, objects[].placement =
-  VLM hint (landmark | roadside | background | scattered), objects[].asset
-  = {task_id} (optional)
+  world.sky = the player's preset, world.mood = VLM pick, track.surface =
+  VLM pick, objects[].type = extracted label, objects[].placement =
+  landmark | roadside | background | scattered, objects[].source =
+  photo | text | filler, objects[].asset = {task_id, provider} (optional)
         ↓
-Unity (WorldGenerator → TrackGenerator + EnvironmentGenerator)
+Unity (WorldGenerator → TrackGenerator + EnvironmentGenerator + ObstacleGenerator)
         ↓
 Generated Loop Track + primitive placeholder environment   ── race starts
         ↓                                                          │
@@ -122,6 +125,45 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   `Audio/MusicPlayer.cs` loops the matching CC0 track from
   `Resources/Audio/Music/` from the countdown through results — see
   docs/decisions/0010-mood-soundtracks.md. No world ambience or dynamic music
+✓ Player-picked sky preset on the upload screen (`world.sky`: sunny |
+  cloudy | sunset | night | indoor, sent as the `sky` form field): Unity
+  builds a painterly gradient skybox at runtime (`Shaders/MarioKart/GhibliSky`,
+  falling back to `Skybox/Procedural`), sets fog/ambient/sun to match, and
+  seeds a matching number of puffy clouds (`Rendering/GhibliClouds.cs`). The
+  `indoor` preset drops the sky and clouds for a toy-box room built around
+  the loop (walls, skirting, windows, glowing ceiling panels —
+  `World/IndoorRoomBuilder.cs`, purely visual, no colliders), tints the
+  ground toward floorboards, and the backend swaps filler's `background`
+  suggestion for library "wall" pieces so the wall lining the track doesn't
+  read as mountains inside a room (`generate_world.py`'s `_indoor_background`)
+✓ VLM-chosen road surface (`track.surface`: concrete | red_bricks |
+  grey_tiles | stone_slabs | dirt) blended into the road colour
+  (`TrackMeshBuilder.SurfaceColor`), and a filler-suggested theme ground
+  colour that lands in `palette[1]` (mock/failed extraction leaves the theme
+  profile's own value)
+✓ Studio-Ghibli-flavoured countryside grade over the toon look: dusty
+  desaturated palette (`Rendering/GhibliLook.cs`), a watercolour post pass
+  per camera (`GhibliPostEffect` — lifted blacks, warm midtones, vignette),
+  paper grain (`PaperGrainEffect`), comic speed lines at the edges of a
+  player's half near top speed (`SpeedLinesEffect`), and a pulsing glow +
+  sparkle on every landmark (`World/LandmarkGlow.cs`)
+✓ Per-player HUD border flash on obstacle hits (green boost, yellow spin,
+  red paralyze — `UI/RaceHUD.cs`), plus cartoon pickup/skid/exhaust
+  particle feedback on the kart (`Players/KartPickupEffect.cs`,
+  `KartSkidEffect.cs`, `KartSpeedEffect.cs`)
+✓ Generated/retrieved meshes get the same outlined toon shader as everything
+  else (restyled once at import in `GeneratedMeshLoader.ImportTemplate`), and
+  roadside/scattered decoration keeps its placeholder-sized primitive
+  collider as a safety net even after the real mesh swaps in, so a kart is
+  blocked rather than clipping through a misplaced prop (landmark and
+  background copies carry no collider)
+
+✓ Comic-book Boot + Upload screens: halftone paper, inked panel frames, a
+  speech-bubble controls hint, onomatopoeia word bursts, a slam-in entrance
+  and hover wobble on every control -- all rasterised at runtime by
+  decorating the scene-baked uGUI hierarchy in `Awake` (`UI/ComicStyle.cs`,
+  see docs/decisions/0013-comic-lobby-ui.md). Generating / HUD / Results
+  keep their existing look
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
@@ -132,34 +174,17 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   objects are still always generated, never looked up) — retrieval is used
   only for generic filler, see docs/decisions/0009-generic-filler-from-poly-pizza.md
 ✗ Real LLM-based world synthesis (theme/palette/track are still a
-  deterministic mock; only vision, text-asset extraction, and mesh
-  generation are real vendors)
+  deterministic keyword mock; the real vendors are the Claude extraction /
+  merge / match-picker calls, Meshy, and Poly Pizza — the VLM does pick
+  `mood` and `track.surface`, and filler suggests `palette[1]`)
 ✗ Ground texture / skybox generation from text (deferred — see
-  docs/decisions/0007-text-to-3d-key-assets.md)
+  docs/decisions/0007-text-to-3d-key-assets.md); the sky is a player-picked
+  preset and the ground is a flat palette colour
 ✗ Persisting generated meshes across backend restarts
-✓ Comic-book Boot + Upload screens: halftone paper, inked panel frames, a
-  speech-bubble controls hint, onomatopoeia word bursts, a slam-in entrance
-  and hover wobble on every control -- all rasterised at runtime by
-  decorating the scene-baked uGUI hierarchy in `Awake` (`UI/ComicStyle.cs`,
-  see docs/decisions/0013-comic-lobby-ui.md). Generating / HUD / Results
-  keep their existing look
 
 ✗ Final VFX, production auth, cloud deployment
 ✗ Webcam capture or drag-and-drop image upload (file-picker only, Editor-only for now — see docs/decisions/0003-image-picker-stub.md)
 ```
-
-## Module ownership
-
-| Owner | Directories |
-|---|---|
-| Person A — AI / backend / WorldRecipe | `backend/**` (vision, text-asset extraction, filler-asset suggestion, cropper, Meshy client, Poly Pizza client, `/generate-world`, `/assets`), `schemas/**`, `unity/Assets/Scripts/AI/**` (incl. `MeshAssetClient.cs`) |
-| Person B — Unity gameplay / track / racing | `unity/Assets/Scripts/Core/**`, `Players/**`, `Racing/**`, `World/TrackGenerator.cs`, `World/WorldGenerator.cs` |
-| Person C — assets / generated meshes / environment | `unity/Assets/Scripts/Assets/**` (namespace `MarioKart.AssetsSystem`, incl. `GeneratedMeshLoader.cs`), `World/EnvironmentGenerator.cs` |
-| Person D — UI / upload flow / QA | `unity/Assets/Scripts/UI/**`, `Input/**`, manual playtesting |
-
-Changes to `schemas/world_recipe.schema.json` affect every module and need
-sign-off from whoever owns the consuming code on both sides (Persons A and B
-at minimum) — see `docs/development.md`'s conventions section.
 
 ## Architecture rules
 
@@ -214,9 +239,11 @@ see `docs/development.md`), and ADRs under `docs/decisions/`.
   Editor; standalone builds use a bundled placeholder image.
 - The mesh task registry is in-memory: restarting the backend orphans any
   in-flight `task_id`s (Unity gets 404s and keeps placeholders).
-- The toon shaders (`Assets/Resources/Shaders/`) and `ToonStyle` have not
-  been compiled or run in the Editor yet; if a shader fails to compile,
-  everything falls back to `Standard` with one warning.
+- The toon shaders (`Assets/Resources/Shaders/`) and the Ghibli sky/cloud/
+  post shaders (`Assets/Shaders/MarioKart/`) are runtime-materialised by
+  `ToonStyle` / `GhibliLook`; if one fails to compile, the affected
+  materials fall back to `Standard` / `Diffuse` (and the sky to
+  `Skybox/Procedural`) with one warning.
 - `GeneratedMeshLoader` / glTFast import has not been run in the Editor
   either; the Meshy and Claude clients have only been exercised against
   scripted fakes in `backend/tests/`.
