@@ -15,4 +15,6 @@ none of this is final art.
 
 **Revisit when:** The team wants real lit/PBR art and is willing to do the
 one-time URP migration (Edit → Render Pipeline → convert materials) inside
-the Editor.
+the Editor. Note that the game's look is now a Built-in surface shader
+(ADR 0008, `Assets/Resources/Shaders/`); a migration would need to port it
+to Shader Graph or a URP-style HLSL shader.

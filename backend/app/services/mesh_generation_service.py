@@ -96,6 +96,12 @@ MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1"
 # CDN download URLs.
 MESHY_TEXT_TO_3D_URL = "https://api.meshy.ai/openapi/v2/text-to-3d"
 
+# Pinned so a future Meshy release can't silently change the look of
+# generated worlds. "meshy-7" is deprecated. Note that 7.x rejects
+# model_type=lowpoly ("not supported for meshy-7"); low poly counts come from
+# should_remesh + target_polycount instead.
+MESHY_AI_MODEL = "meshy-7.1"
+
 # Meshy task status -> our provider-neutral status.
 _MESHY_STATUS_MAP: dict[str, MeshStatus] = {
     "PENDING": "pending",
@@ -142,8 +148,9 @@ class MeshyMeshGenerationService(MeshGenerationService):
     def __init__(
         self,
         api_key: str,
-        model_type: str = "lowpoly",
+        model_type: str = "standard",
         should_texture: bool = True,
+        target_polycount: int = 8000,
         base_url: str = MESHY_BASE_URL,
         text_geometry_resolution: str = "standard",
         text_texture_resolution: str = "2k",
@@ -155,6 +162,7 @@ class MeshyMeshGenerationService(MeshGenerationService):
             raise ValueError("MESHY_API_KEY is required for MESH_PROVIDER=meshy")
         self._model_type = model_type
         self._should_texture = should_texture
+        self._target_polycount = target_polycount
         self._text_geometry_resolution = text_geometry_resolution
         self._text_texture_resolution = text_texture_resolution
         self._text_enable_pbr = text_enable_pbr
@@ -180,7 +188,9 @@ class MeshyMeshGenerationService(MeshGenerationService):
                 "image_url": data_uri,
                 "model_type": self._model_type,
                 "should_texture": self._should_texture,
-                "ai_model": "latest",
+                "ai_model": MESHY_AI_MODEL,
+                "should_remesh": True,
+                "target_polycount": self._target_polycount,
             },
         )
         response.raise_for_status()
@@ -194,7 +204,7 @@ class MeshyMeshGenerationService(MeshGenerationService):
             json={
                 "mode": "preview",
                 "prompt": asset.prompt,
-                "ai_model": "latest",
+                "ai_model": MESHY_AI_MODEL,
                 "geometry_resolution": self._text_geometry_resolution,
             },
         )

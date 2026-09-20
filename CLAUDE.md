@@ -62,12 +62,18 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ Generic filler-asset suggestion (Claude, photo+text) + retrieval from a
   public asset library (Poly Pizza) to diversify and fill out the world
   cheaply, for scattered/roadside/background objects only — see
-  docs/decisions/0008-generic-filler-from-poly-pizza.md
+  docs/decisions/0009-generic-filler-from-poly-pizza.md
 ✓ Async mesh delivery: the world is built on primitive placeholders and
   generated meshes swap in when ready (placeholders stay if generation
   fails). By default the Generating screen waits for the meshes, with a
   timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
   turn it off to race immediately while they stream in
+✓ Cel-shaded look on everything (placeholders, track, karts, generated
+  meshes), with the shadow band and rim light driven by the recipe palette
+  (`GameConfig.toonShading`, `Assets/Scripts/Rendering/ToonStyle.cs` — see
+  docs/decisions/0008-toon-shading.md); matching cartoon particle effects
+  (outlined hard-edged shapes, stepped colours, shrink-out) in
+  `Players/KartParticles.cs`
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
@@ -76,7 +82,7 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✗ Complex procedural terrain
 ✗ Asset retrieval / asset-pack lookup for *specific* objects (photo/text
   objects are still always generated, never looked up) — retrieval is used
-  only for generic filler, see docs/decisions/0008-generic-filler-from-poly-pizza.md
+  only for generic filler, see docs/decisions/0009-generic-filler-from-poly-pizza.md
 ✗ Real LLM-based world synthesis (theme/palette/track are still a
   deterministic mock; only vision, text-asset extraction, and mesh
   generation are real vendors)
@@ -118,7 +124,7 @@ at minimum) — see `docs/development.md`'s conventions section.
    `GET /assets/{task_id}` / `GET /assets/{task_id}/model.glb` for every
    mesh, generated or retrieved (see
    `docs/decisions/0006-meshy-async-mesh-generation.md` and
-   `docs/decisions/0008-generic-filler-from-poly-pizza.md`). No other
+   `docs/decisions/0009-generic-filler-from-poly-pizza.md`). No other
    networking: this is a local, same-keyboard game.
 5. **Do not add gameplay features outside the current scope** (items,
    obstacles, multiple tracks, etc.) without team agreement — update this
@@ -153,6 +159,9 @@ see `docs/development.md`), and ADRs under `docs/decisions/`.
   Editor; standalone builds use a bundled placeholder image.
 - The mesh task registry is in-memory: restarting the backend orphans any
   in-flight `task_id`s (Unity gets 404s and keeps placeholders).
+- The toon shaders (`Assets/Resources/Shaders/`) and `ToonStyle` have not
+  been compiled or run in the Editor yet; if a shader fails to compile,
+  everything falls back to `Standard` with one warning.
 - `GeneratedMeshLoader` / glTFast import has not been run in the Editor
   either; the Meshy and Claude clients have only been exercised against
   scripted fakes in `backend/tests/`.

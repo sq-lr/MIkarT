@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MarioKart.AI;
 using MarioKart.Racing;
+using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.World
@@ -46,7 +47,18 @@ namespace MarioKart.World
             }
 
             ApplyPalette(recipe.palette);
-            ApplySky(recipe.world != null ? recipe.world.sky : "sunny");
+            ApplySky(recipe.world != null ? recipe.world.sky : "sunny", recipe.palette);
+
+            var config = MarioKart.Core.GameManager.Instance != null ? MarioKart.Core.GameManager.Instance.Config : null;
+            ToonStyle.ConfigureShadows(sunLight, config != null ? config.shadowDistance : 70f);
+            if (groundRenderer != null)
+            {
+                // Receive only, like the road (see TrackMeshBuilder.BuildRoad).
+                groundRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                // The Ground .mat asset is built with rim off; guard against
+                // a scene whose materials predate that (see ToonStyle.Create).
+                ToonStyle.DisableRim(groundRenderer.material);
+            }
 
             OnWorldReady?.Invoke();
         }
@@ -129,9 +141,10 @@ namespace MarioKart.World
 
         /// <summary>
         /// Sky preset chosen on the upload screen (recipe.world.sky): tints
-        /// ambient light and the cameras' clear colour.
+        /// ambient light and the cameras' clear colour, and (with the
+        /// palette) the toon shadow band and rim light.
         /// </summary>
-        private void ApplySky(string sky)
+        private void ApplySky(string sky, List<string> palette)
         {
             Color background;
             Color ambient;
@@ -156,6 +169,7 @@ namespace MarioKart.World
             }
 
             RenderSettings.ambientLight = ambient;
+            ToonStyle.ApplyPalette(palette, ambient);
             foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
             {
                 camera.clearFlags = CameraClearFlags.SolidColor;

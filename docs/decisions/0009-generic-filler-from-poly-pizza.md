@@ -1,4 +1,4 @@
-# 0008 — Fill out the world with generic props retrieved from Poly Pizza, not generated
+# 0009 — Fill out the world with generic props retrieved from Poly Pizza, not generated
 
 **Decision:** A third, independent Claude call suggests generic filler
 props to diversify and fill out the world, retrieved from a public asset

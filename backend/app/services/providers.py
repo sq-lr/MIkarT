@@ -90,8 +90,9 @@ def build_from_env() -> Providers:
             raise RuntimeError("MESH_PROVIDER=meshy requires MESHY_API_KEY")
         mesh = MeshyMeshGenerationService(
             api_key=api_key,
-            model_type=os.environ.get("MESHY_MODEL_TYPE", "lowpoly"),
+            model_type=os.environ.get("MESHY_MODEL_TYPE", "standard"),
             should_texture=_env_bool("MESHY_SHOULD_TEXTURE", True),
+            target_polycount=int(os.environ.get("MESHY_TARGET_POLYCOUNT", "8000")),
             text_geometry_resolution=os.environ.get("MESHY_TEXT_GEOMETRY_RESOLUTION", "standard"),
             text_texture_resolution=os.environ.get("MESHY_TEXT_TEXTURE_RESOLUTION", "2k"),
             text_enable_pbr=_env_bool("MESHY_TEXT_ENABLE_PBR", False),

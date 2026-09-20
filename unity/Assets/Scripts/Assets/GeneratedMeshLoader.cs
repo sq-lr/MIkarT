@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GLTFast;
 using MarioKart.AI;
 using MarioKart.Core;
+using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.AssetsSystem
@@ -229,6 +230,11 @@ namespace MarioKart.AssetsSystem
             // The import owns the meshes/materials the template references;
             // keep it alive until Clear().
             imports.Add(import);
+
+            // Match the rest of the world's cel-shaded look. No-op when toon
+            // shading is off; on any failure the glTFast materials stay.
+            ToonStyle.Restyle(template);
+
             template.SetActive(false);
             cache.StoreMeshTemplate(taskId, template);
         }

@@ -6,6 +6,7 @@ using MarioKart.Core;
 using MarioKart.InputSystem;
 using MarioKart.Players;
 using MarioKart.Racing;
+using MarioKart.Rendering;
 using MarioKart.UI;
 using MarioKart.World;
 using UnityEditor;
@@ -64,15 +65,13 @@ namespace MarioKart.EditorTools
                 foreach (var go in existing) Object.DestroyImmediate(go);
             }
 
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            var kartRed = EnsureMaterial("Kart_P1", new Color(0.85f, 0.2f, 0.2f));
-            var kartBlue = EnsureMaterial("Kart_P2", new Color(0.2f, 0.4f, 0.9f));
-            var groundMat = EnsureMaterial("Ground", new Color(0.35f, 0.55f, 0.3f));
+            var font = GameFonts.Display; // comic lettering; GameFonts.Body is used for typed text
+            EnsureMaterials(out var kartRed, out var kartBlue, out var groundMat);
 
             // ---- Lighting ----------------------------------------------------
             var sun = new GameObject("Directional Light", typeof(Light)).GetComponent<Light>();
             sun.type = LightType.Directional;
-            sun.shadows = LightShadows.Soft;
+            sun.shadows = LightShadows.Hard; // crisp ink-edged shadows; ToonStyle.ConfigureShadows re-applies at runtime
             sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
             // ---- GameManager + backend clients --------------------------------
@@ -106,6 +105,7 @@ namespace MarioKart.EditorTools
             ground.transform.localScale = new Vector3(GroundScale, 1f, GroundScale);
             var groundRenderer = ground.GetComponent<Renderer>();
             groundRenderer.sharedMaterial = groundMat;
+            groundRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // receive only; casting = self-shadow acne
 
             // ---- Karts -----------------------------------------------------
             var kart1 = BuildKart("Kart_P1", 1, kartRed, new Vector3(-2f, 0.35f, 0f));
@@ -181,11 +181,44 @@ namespace MarioKart.EditorTools
         }
 
         /// <summary>
+        /// Re-point the kart and ground material assets at the toon shaders
+        /// (docs/decisions/0008) without rebuilding the scene. Build Main
+        /// Scene does this too; this is for applying a shader change to an
+        /// existing scene.
+        /// </summary>
+        [MenuItem("MarioKart/Apply Toon Materials")]
+        public static void ApplyToonMaterials()
+        {
+            EnsureMaterials(out _, out _, out _);
+            AssetDatabase.SaveAssets();
+            Debug.Log("MainSceneBuilder: kart and ground materials now use the MarioKart/Toon shaders.");
+        }
+
+        /// <summary>
+        /// The three material assets the scene references. Karts get the
+        /// outlined toon shader with a full-strength rim so they stay
+        /// readable at split-screen size; the ground gets the outline-free
+        /// variant. Falls back to Standard if the shaders fail to compile.
+        /// </summary>
+        private static void EnsureMaterials(out Material kartRed, out Material kartBlue, out Material ground)
+        {
+            var toon = Shader.Find("MarioKart/Toon") ?? Shader.Find("Standard");
+            var toonFlat = Shader.Find("MarioKart/Toon (No Outline)") ?? Shader.Find("Standard");
+
+            // Karts: full rim and a hard specular dot (glossy toy); the
+            // environment gets neither.
+            kartRed = EnsureMaterial("Kart_P1", new Color(0.85f, 0.2f, 0.2f), toon, rimStrength: 1f, specStrength: 1f);
+            kartBlue = EnsureMaterial("Kart_P2", new Color(0.2f, 0.4f, 0.9f), toon, rimStrength: 1f, specStrength: 1f);
+            ground = EnsureMaterial("Ground", new Color(0.35f, 0.55f, 0.3f), toonFlat, rimStrength: 0f, specStrength: 0f);
+        }
+
+        /// <summary>
         /// Materials must be real assets (not scene-embedded objects) or
         /// they're dropped on save. Reuses an existing one so re-running the
-        /// builder doesn't churn GUIDs.
+        /// builder doesn't churn GUIDs; the shader is reassigned every time
+        /// so an existing asset picks up shader changes.
         /// </summary>
-        private static Material EnsureMaterial(string name, Color color)
+        private static Material EnsureMaterial(string name, Color color, Shader shader, float rimStrength, float specStrength)
         {
             if (!AssetDatabase.IsValidFolder(MaterialsFolder))
             {
@@ -196,10 +229,13 @@ namespace MarioKart.EditorTools
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material == null)
             {
-                material = new Material(Shader.Find("Standard"));
+                material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path);
             }
+            material.shader = shader;
             material.color = color;
+            if (material.HasProperty("_RimStrength")) material.SetFloat("_RimStrength", rimStrength);
+            if (material.HasProperty("_SpecStrength")) material.SetFloat("_SpecStrength", specStrength);
             EditorUtility.SetDirty(material);
             return material;
         }
@@ -210,7 +246,10 @@ namespace MarioKart.EditorTools
 
         private static GameObject BuildKart(string name, int playerIndex, Material material, Vector3 position)
         {
-            var kart = GameObject.CreatePrimitive(PrimitiveType.Cube); // comes with a BoxCollider
+            // The cube is the physics body (BoxCollider) and carries the
+            // player-colour material; KartVisual hides it at runtime and
+            // builds the go-kart shape on top of it.
+            var kart = GameObject.CreatePrimitive(PrimitiveType.Cube);
             kart.name = name;
             kart.transform.position = position;
             kart.transform.localScale = new Vector3(1.6f, 0.6f, 2.6f);
@@ -227,6 +266,7 @@ namespace MarioKart.EditorTools
             var player = kart.AddComponent<PlayerController>();
             var laps = kart.AddComponent<LapManager>();
             laps.playerIndex = playerIndex;
+            kart.AddComponent<KartVisual>();      // builds the wheels/body/driver meshes at runtime
             kart.AddComponent<KartSpeedEffect>(); // builds its own particle systems at runtime
             kart.AddComponent<KartSkidEffect>();  // likewise: smoke, sparks, skid marks
 
@@ -248,7 +288,7 @@ namespace MarioKart.EditorTools
 
         private static PlayerCamera BuildCamera(string name, int playerIndex, Transform target, bool withAudioListener)
         {
-            var go = new GameObject(name, typeof(Camera), typeof(PlayerCamera));
+            var go = new GameObject(name, typeof(Camera), typeof(PlayerCamera), typeof(PaperGrainEffect), typeof(SpeedLinesEffect));
             if (withAudioListener) go.AddComponent<AudioListener>(); // exactly one per scene
 
             var cam = go.GetComponent<Camera>();
@@ -256,16 +296,15 @@ namespace MarioKart.EditorTools
             cam.rect = playerIndex == 1 ? new Rect(0f, 0.5f, 1f, 0.5f) : new Rect(0f, 0f, 1f, 0.5f);
             cam.depth = playerIndex;
 
-            // Tight, high chase cam: close behind and well above the kart,
-            // pitched ~28° down at the road just ahead of it.
+            // Chase cam tuned in the Editor: 2.15 m above and 6.2 m behind the
+            // kart, pitched 12.47° down. Same for both players.
             var follow = go.GetComponent<PlayerCamera>();
-            follow.offset = new Vector3(0f, 3.5f, -3.5f);
-            follow.lookOffset = new Vector3(0f, 0f, 3f);
-            go.transform.position = target.TransformPoint(follow.offset);
-            go.transform.LookAt(target.TransformPoint(follow.lookOffset));
-
+            follow.offset = new Vector3(0f, 2.15f, -6.2f);
+            follow.pitchDegrees = 12.47f;
+            follow.yawDegrees = 0f;
             Set(follow, "cam", cam);
             Set(follow, "target", target);
+            follow.SnapToTarget();
             return follow;
         }
 
@@ -290,7 +329,7 @@ namespace MarioKart.EditorTools
         {
             var panel = CreatePanel(canvas.transform, "LobbyUI", dim: true, out var holder);
             CreateText(panel.transform, "Title", "MARIO KART: AI WORLDS", font, 64, Center, new Vector2(0f, 120f), new Vector2(1200f, 100f), TextAnchor.MiddleCenter);
-            CreateText(panel.transform, "Hint", "P1: WASD    P2: Arrow keys", font, 28, Center, new Vector2(0f, 40f), new Vector2(800f, 40f), TextAnchor.MiddleCenter);
+            CreateText(panel.transform, "Hint", "P1: WASD    P2: Arrow keys", GameFonts.Body, 28, Center, new Vector2(0f, 40f), new Vector2(800f, 40f), TextAnchor.MiddleCenter);
             var start = CreateButton(panel.transform, "StartButton", "Start", font, new Vector2(0f, -60f), new Vector2(320f, 80f));
 
             var ui = holder.AddComponent<LobbyUI>();
@@ -310,7 +349,8 @@ namespace MarioKart.EditorTools
             SetRect(preview.rectTransform, Center, new Vector2(0f, 120f), new Vector2(480f, 360f));
 
             var choose = CreateButton(panel.transform, "ChooseImageButton", "Choose Image", font, new Vector2(0f, -110f), new Vector2(320f, 70f));
-            var description = CreateInputField(panel.transform, "DescriptionField", "One sentence about the scene in the photo...", font, new Vector2(0f, -210f), new Vector2(900f, 70f));
+            // Typed text gets the mixed-case body font; Bangers is all caps.
+            var description = CreateInputField(panel.transform, "DescriptionField", "One sentence about the scene in the photo...", GameFonts.Body, new Vector2(0f, -210f), new Vector2(900f, 70f));
             CreateText(panel.transform, "SurfaceHint", "Track surface is selected from the uploaded image", font, 22, Center, new Vector2(0f, -285f), new Vector2(900f, 36f), TextAnchor.MiddleCenter);
             var skyGroup = new GameObject("SkyOptions", typeof(RectTransform), typeof(ToggleGroup)).GetComponent<ToggleGroup>();
             skyGroup.transform.SetParent(panel.transform, false);
