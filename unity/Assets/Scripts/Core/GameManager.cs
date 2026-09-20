@@ -53,7 +53,7 @@ namespace MarioKart.Core
             { GameState.Generating, new[] { GameState.WorldReady, GameState.Input } },
             { GameState.WorldReady, new[] { GameState.Countdown } },
             { GameState.Countdown, new[] { GameState.Racing } },
-            { GameState.Racing, new[] { GameState.Finished } },
+            { GameState.Racing, new[] { GameState.Finished, GameState.Boot } },
             { GameState.Finished, new[] { GameState.Results } },
             { GameState.Results, new[] { GameState.Boot } },
         };
@@ -197,10 +197,15 @@ namespace MarioKart.Core
             TransitionTo(GameState.Racing);
         }
 
+        /// <summary>Leave a live race and start over.</summary>
+        public void PlayAgain()
+        {
+            TransitionTo(GameState.Boot);
+        }
+
         private void OnRaceFinished(RaceResult result)
         {
-            TransitionTo(GameState.Finished);
-            TransitionTo(GameState.Results);
+            // Stay in Racing so karts keep moving under the winner banner.
             resultsUI?.DisplayResult(result);
         }
     }
