@@ -21,10 +21,24 @@ namespace MarioKart.World
 
         /// <summary>
         /// Rise per metre of the embankment that carries a raised road down
-        /// to ground level (1:2). Shared by the mesh builder (which draws it)
-        /// and GroundHeightAt (which rests objects on it).
+        /// to ground level (1:2), starting past the shoulder (see
+        /// ShoulderWidth). Shared by the mesh builder (which draws it) and
+        /// GroundHeightAt (which rests objects on it).
         /// </summary>
         public const float ApronGrade = 0.5f;
+
+        /// <summary>
+        /// Flat shelf immediately past the wall, before the embankment
+        /// starts sloping down -- wide enough to cover both
+        /// EnvironmentGenerator's roadsideBand and nearBand, so the roadside
+        /// props and near-band clusters that actually get placed there sit
+        /// level with the track instead of sinking into the slope a metre
+        /// or two out.
+        /// </summary>
+        public const float ShoulderWidth = 8f;
+
+        /// <summary>Height of the shoulder above the track surface -- a touch proud of it, not just level, so nearby props read as clearly on their own ground rather than flush with the road.</summary>
+        public const float ShoulderRise = 0.15f;
 
         /// <summary>Ground level away from the track (the flat plane objects rested on before elevation existed).</summary>
         public const float GroundLevel = 0f;
@@ -104,9 +118,10 @@ namespace MarioKart.World
 
         /// <summary>
         /// Height of the ground an object at `position` should rest on: the
-        /// road's height between the walls, the embankment's height across
-        /// the berm outside them, and GroundLevel once the berm has reached
-        /// the plain.
+        /// road's height between the walls, a flat (slightly raised)
+        /// shoulder for a few metres past them, the embankment's height
+        /// sloping down beyond the shoulder, and GroundLevel once the berm
+        /// has reached the plain.
         /// </summary>
         public float GroundHeightAt(Vector3 position) => GroundHeightAt(position, out _);
 
@@ -115,7 +130,20 @@ namespace MarioKart.World
         {
             lateral = ProjectOntoCentreline(position, out float centreHeight);
             float edge = width * 0.5f + TrackMeshBuilder.WallThickness;
-            float height = lateral <= edge ? centreHeight : centreHeight - (lateral - edge) * ApronGrade;
+            float shoulderEdge = edge + ShoulderWidth;
+            float height;
+            if (lateral <= edge)
+            {
+                height = centreHeight;
+            }
+            else if (lateral <= shoulderEdge)
+            {
+                height = centreHeight + ShoulderRise;
+            }
+            else
+            {
+                height = centreHeight + ShoulderRise - (lateral - shoulderEdge) * ApronGrade;
+            }
             return Mathf.Max(GroundLevel, height);
         }
 
@@ -127,7 +155,7 @@ namespace MarioKart.World
         {
             float highest = 0f;
             foreach (var p in Samples) highest = Mathf.Max(highest, p.y);
-            return width * 0.5f + TrackMeshBuilder.WallThickness + highest / ApronGrade;
+            return width * 0.5f + TrackMeshBuilder.WallThickness + ShoulderWidth + (highest + ShoulderRise) / ApronGrade;
         }
 
         /// <summary>

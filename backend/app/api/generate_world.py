@@ -34,7 +34,7 @@ async def generate_world(
     # Off by default (see the upload screen's "Generate personalized assets"
     # toggle): skips Meshy entirely and sources every object -- including up
     # to MAX_LANDMARKS landmarks -- from library retrieval instead. See
-    # docs/decisions/0010-personalize-toggle.md.
+    # docs/decisions/0012-personalize-toggle.md.
     personalize: bool = Form(False),
 ) -> WorldRecipeResponse:
     if image.content_type not in _ALLOWED_CONTENT_TYPES:
@@ -96,7 +96,7 @@ async def generate_world(
         #    keeps a placeholder, or for filler is simply dropped); it never
         #    fails the world.
         image_mesh_tasks, text_mesh_tasks = _submit_mesh_tasks(providers.mesh, crops, key_assets)
-        filler_mesh_tasks = _submit_filler_assets(providers.library, filler_candidates)
+        filler_candidates, filler_mesh_tasks = _submit_filler_assets(providers.library, filler_candidates)
         for task in image_mesh_tasks + text_mesh_tasks + filler_mesh_tasks:
             providers.registry.add(task)
 
@@ -152,16 +152,44 @@ def _submit_mesh_tasks(
     return image_tasks, text_tasks
 
 
-def _submit_filler_assets(library: LibraryAssetService, filler_assets: list[FillerAsset]) -> list[MeshTask]:
+def _submit_filler_assets(
+    library: LibraryAssetService, filler_assets: list[FillerAsset]
+) -> tuple[list[FillerAsset], list[MeshTask]]:
     """Search the library for each filler keyword, one at a time. A keyword
     with no match (or a failed search) simply isn't added -- filler was never
-    essential, so there's nothing to fall back to for it."""
+    essential, so there's nothing to fall back to for it.
 
-    def submit_one(asset: FillerAsset) -> MeshTask | None:
+    A "background" keyword is the continuous mountain/treeline wall lining
+    the whole track (EnvironmentGenerator.PlaceBackgroundWall) -- with only
+    one matched mesh, that wall would visibly repeat the same shape hundreds
+    of times. So background keywords additionally get a second, genuinely
+    different match submitted (excluding the first result's ID) under a
+    synthetic f"{keyword}_2" label, giving Unity's wall two shapes to
+    alternate between. Returns the (possibly expanded with variants) asset
+    list alongside its tasks, since the caller passes both into synthesize().
+    """
+
+    def submit_one(asset: FillerAsset, exclude_ids: frozenset[str] = frozenset()) -> MeshTask | None:
         try:
-            return library.submit(asset)
+            return library.submit(asset, exclude_ids=exclude_ids)
         except Exception:
             logger.exception("library search failed for %r; filler dropped", asset.keyword)
             return None
 
-    return [task for asset in filler_assets if (task := submit_one(asset)) is not None]
+    assets: list[FillerAsset] = []
+    tasks: list[MeshTask] = []
+    for asset in filler_assets:
+        task = submit_one(asset)
+        if task is None:
+            continue
+        assets.append(asset)
+        tasks.append(task)
+
+        if asset.placement == "background":
+            variant_task = submit_one(asset, exclude_ids=frozenset({task.task_id}))
+            if variant_task is not None:
+                variant_keyword = f"{asset.keyword}_2"
+                assets.append(asset.model_copy(update={"keyword": variant_keyword}))
+                tasks.append(MeshTask(task_id=variant_task.task_id, object_type=variant_keyword, provider=variant_task.provider))
+
+    return assets, tasks

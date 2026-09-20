@@ -16,7 +16,7 @@ namespace MarioKart.AI
         // object (including up to 2 landmarks) from library retrieval
         // instead -- fast and free, at the cost of not reflecting the
         // specific things in the photo/description. See
-        // docs/decisions/0010-personalize-toggle.md.
+        // docs/decisions/0012-personalize-toggle.md.
         public bool personalize;
 
         public WorldGenerationRequest(byte[] imageBytes, string imageFileName, string description, string sky, bool personalize)

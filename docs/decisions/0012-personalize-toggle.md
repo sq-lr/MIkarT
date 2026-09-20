@@ -1,4 +1,4 @@
-# 0010 — A "generate personalized assets" toggle, off by default, that skips Meshy entirely
+# 0012 — A "generate personalized assets" toggle, off by default, that skips Meshy entirely
 
 **Decision:** The upload screen gets a new toggle, **"Generate personalized
 assets," off by default**, sent to the backend as `personalize` on

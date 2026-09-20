@@ -48,7 +48,22 @@ namespace MarioKart.Rendering
         {
             if (renderer == null || renderer is ParticleSystemRenderer) return;
 
-            var current = renderer.sharedMaterial;
+            // A retrieved/generated mesh often has one material per part
+            // (e.g. a bench's "Metal" legs and "Wood" seat as two separate
+            // glTF materials) -- restyling only sharedMaterial (submesh 0)
+            // left every other submesh on its raw glTFast-imported material,
+            // which the render pipeline can show as an error checkerboard.
+            // Every submesh needs converting, not just the first.
+            var materials = renderer.sharedMaterials;
+            for (int i = 0; i < materials.Length; i++)
+            {
+                materials[i] = RestyleMaterial(materials[i]);
+            }
+            renderer.sharedMaterials = materials;
+        }
+
+        private static Material RestyleMaterial(Material current)
+        {
             Color albedo = Color.white;
             Texture tex = null;
             if (current != null)
@@ -61,7 +76,7 @@ namespace MarioKart.Rendering
 
             var mat = Lit(albedo);
             if (tex != null && mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", tex);
-            renderer.sharedMaterial = mat;
+            return mat;
         }
 
         public static void RestyleTree(GameObject root)

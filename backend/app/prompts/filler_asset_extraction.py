@@ -10,7 +10,7 @@ directly to that library's keyword search by
 app.services.library_asset_service, so it must be a simple, common search
 term, not a vivid description.
 
-`max_landmarks` is normally 0 (see docs/decisions/0010-personalize-toggle.md):
+`max_landmarks` is normally 0 (see docs/decisions/0012-personalize-toggle.md):
 filler is generic clutter, never a centrepiece, and this call only tops up
 whatever the (separate) photo/text-to-Meshy steps already produced. It's only
 raised when the "generate personalized assets" toggle is off, since in that

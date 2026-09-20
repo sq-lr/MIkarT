@@ -38,11 +38,16 @@ logger = logging.getLogger(__name__)
 
 class LibraryAssetService(ABC):
     @abstractmethod
-    def submit(self, asset: FillerAsset) -> MeshTask | None:
+    def submit(self, asset: FillerAsset, exclude_ids: frozenset[str] = frozenset()) -> MeshTask | None:
         """Search the library for asset.keyword. Returns None if nothing
         matched (the object is simply dropped -- unlike Meshy, there's no
         generation fallback) or this provider has no library (mock); raises
-        on a real provider error."""
+        on a real provider error.
+
+        `exclude_ids` skips those result IDs before matching -- used to pull
+        a second, genuinely different match for the same keyword (see
+        generate_world._submit_filler_assets's background-wall variety),
+        rather than returning the same result again."""
         raise NotImplementedError
 
     @abstractmethod
@@ -58,7 +63,7 @@ class MockLibraryAssetService(LibraryAssetService):
     """Bootstrap/offline default: no library to search, every filler keyword
     is simply dropped."""
 
-    def submit(self, asset: FillerAsset) -> MeshTask | None:
+    def submit(self, asset: FillerAsset, exclude_ids: frozenset[str] = frozenset()) -> MeshTask | None:
         return None
 
     def get_status(self, task_id: str) -> MeshTaskStatus:
@@ -114,11 +119,11 @@ class PolyPizzaLibraryAssetService(LibraryAssetService):
         self._model_cache: dict[str, bytes] = {}
         self._lock = threading.Lock()
 
-    def submit(self, asset: FillerAsset) -> MeshTask | None:
+    def submit(self, asset: FillerAsset, exclude_ids: frozenset[str] = frozenset()) -> MeshTask | None:
         response = self._client.get(f"/search/{asset.keyword}")
         response.raise_for_status()
         body = response.json()
-        results = body.get("results") or []
+        results = [r for r in (body.get("results") or []) if r["ID"] not in exclude_ids]
         results_by_id = {r["ID"]: r for r in results}
         candidates = [
             MatchCandidate(id=r["ID"], title=r["Title"], tags=r.get("Tags") or [], category=r.get("Category"))

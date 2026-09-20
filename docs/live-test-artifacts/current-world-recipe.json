@@ -1,0 +1,135 @@
+{
+  "world_recipe": {
+    "version": 1,
+    "seed": 939416237,
+    "world": {
+      "name": "Frostbite Summit",
+      "theme": "snowy mountain",
+      "terrain": "snow",
+      "weather": "snowy",
+      "time_of_day": "day",
+      "sky": "sunny"
+    },
+    "track": {
+      "width": 16.0,
+      "length": 800.0,
+      "difficulty": 0.5,
+      "surface": "grey_tiles"
+    },
+    "objects": [
+      {
+        "type": "statue",
+        "density": 0.15,
+        "placement": "landmark",
+        "asset": {
+          "task_id": "AK9CmjFnL6",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "bare_tree",
+        "density": 0.5,
+        "placement": "roadside",
+        "asset": {
+          "task_id": "n8FhMgMldD",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "street_lamp",
+        "density": 0.45,
+        "placement": "roadside",
+        "asset": {
+          "task_id": "nFwrlcLvM5",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "park_bench",
+        "density": 0.35,
+        "placement": "roadside",
+        "asset": {
+          "task_id": "kn0sMwbspb",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "bulletin_board",
+        "density": 0.2,
+        "placement": "scattered",
+        "asset": {
+          "task_id": "9x50CBKNzPq",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "bicycle",
+        "density": 0.3,
+        "placement": "scattered",
+        "asset": {
+          "task_id": "19VoUuA2pcN",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "trash_can",
+        "density": 0.3,
+        "placement": "roadside",
+        "asset": {
+          "task_id": "PEtRDeGyg0",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "bollard",
+        "density": 0.4,
+        "placement": "roadside",
+        "asset": {
+          "task_id": "JSQJ07PFj2",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "bush",
+        "density": 0.55,
+        "placement": "scattered",
+        "asset": {
+          "task_id": "d6STyhH76Qe",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "planter",
+        "density": 0.3,
+        "placement": "scattered",
+        "asset": {
+          "task_id": "wn85Xr9lM3",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "office_building",
+        "density": 0.15,
+        "placement": "background",
+        "asset": {
+          "task_id": "yKo7F36Qk2",
+          "provider": "polypizza"
+        }
+      },
+      {
+        "type": "fence",
+        "density": 0.35,
+        "placement": "roadside",
+        "asset": {
+          "task_id": "e02PFKKhbr",
+          "provider": "polypizza"
+        }
+      }
+    ],
+    "palette": [
+      "#A9C7DE",
+      "#FFFFFF",
+      "#6E7C8C"
+    ]
+  }
+}

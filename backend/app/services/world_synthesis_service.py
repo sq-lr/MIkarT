@@ -72,7 +72,7 @@ class WorldSynthesisService(ABC):
         False (the "generate personalized assets" toggle is off), the whole
         world is sourced from `filler_assets`/`filler_mesh_tasks` alone, which
         by convention were requested with landmarks allowed in that case (see
-        docs/decisions/0010-personalize-toggle.md) -- `mesh_tasks`/`text_mesh_tasks`
+        docs/decisions/0012-personalize-toggle.md) -- `mesh_tasks`/`text_mesh_tasks`
         should be empty when `personalize` is False, since nothing should have
         been submitted to Meshy."""
         raise NotImplementedError
@@ -320,7 +320,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
             )
         else:
             # Personalization off: the whole world comes from filler/library
-            # retrieval instead -- see docs/decisions/0010-personalize-toggle.md.
+            # retrieval instead -- see docs/decisions/0012-personalize-toggle.md.
             photo_objects = []
             text_objects = []
         filler_objects = _objects_from_filler_assets(

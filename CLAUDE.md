@@ -74,7 +74,7 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   (including up to 2 landmarks) is sourced from library retrieval instead,
   with filler prompted to translate what's actually in the photo/text into
   generic search terms before rounding out with unrelated filler — see
-  docs/decisions/0010-personalize-toggle.md
+  docs/decisions/0012-personalize-toggle.md
 ✓ Async mesh delivery: the world is built on primitive placeholders and
   generated meshes swap in when ready (placeholders stay if generation
   fails). By default the Generating screen waits for the meshes, with a

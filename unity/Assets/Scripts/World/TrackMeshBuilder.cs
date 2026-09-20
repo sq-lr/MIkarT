@@ -7,12 +7,14 @@ namespace MarioKart.World
     /// <summary>
     /// Turns a GeneratedTrack (a coarse loop of control points) into the
     /// physical track: a smooth road ribbon (with a collider -- the road is
-    /// what the karts drive on now that it has hills), a solid barrier wall
-    /// along each edge, and an embankment sloping from each wall down to
-    /// the ground plane wherever the road is raised. Purely geometric and
-    /// deterministic -- no randomness, so it needs no seed. The barrier
-    /// walls carry a TrackBarrier so karts that touch them are slowed (see
-    /// KartController).
+    /// what the karts drive on now that it has hills), a low curb-height
+    /// barrier along each edge, and an embankment sloping from each curb
+    /// down to the ground plane wherever the road is raised. Purely
+    /// geometric and deterministic -- no randomness, so it needs no seed.
+    /// The barriers carry a TrackBarrier so karts that touch them are
+    /// slowed (see KartController), and are kept low so roadside/scattered
+    /// environment props placed just outside them (EnvironmentGenerator)
+    /// aren't hidden behind a tall wall.
     /// </summary>
     public static class TrackMeshBuilder
     {
@@ -22,7 +24,17 @@ namespace MarioKart.World
 
         public const float RoadHeight = 0.02f;    // road surface above the centreline
         public const float WallThickness = 0.5f;
-        private const float WallHeight = 1.2f;
+        // Curb-height, not a tall wall: a solid wall this close to the road
+        // (WallThickness + roadsideBand puts environment props only ~1-3m
+        // behind it) hid most roadside/scattered decoration behind its own
+        // silhouette. Visual only -- see WallCollisionHeight for the actual
+        // collision boundary, which stays tall so this doesn't also let
+        // karts drive or jump over what is now a short curb.
+        private const float WallHeight = 0.35f;
+        // The wall's previous (pre-curb) height, kept as an invisible
+        // collision-only barrier at the same footprint (see BuildWall) so
+        // shrinking the visible wall didn't also shrink what stops a kart.
+        private const float WallCollisionHeight = 1.2f;
         // Terrain height-field (see BuildTerrain).
         private const float TerrainCellSize = 2f;         // metres, minimum
         private const int TerrainMaxCellsPerSide = 220;   // caps the vertex count for long loops
@@ -371,17 +383,25 @@ namespace MarioKart.World
         /// A closed, thick strip: inner face (toward the road), outer face,
         /// and top. Front faces point outward so the kart always hits a
         /// front face from the road side (mesh colliders are one-sided).
+        ///
+        /// Builds TWO of these at the same footprint: the visible curb (only
+        /// WallHeight tall, so roadside/scattered props placed just outside
+        /// it aren't hidden behind it) and an invisible collision-only wall
+        /// at the taller WallCollisionHeight, so a kart still can't drive or
+        /// jump over what now merely *looks* like a low curb.
         /// </summary>
         private static void BuildWall(Transform root, string name, List<Vector3> centers, Vector3[] rights,
             float edgeOffset, float outwardSign, Color color)
         {
             int n = centers.Count;
-            var builder = new MeshBuilder();
+            var visual = new MeshBuilder();
+            var collision = new MeshBuilder();
             // The faces start WallSkirt below road level so the terrain's dip
             // under the road (BuildTerrain) can never show as a slit beneath
             // them; `top` is measured from that lowered base.
             Vector3 skirt = Vector3.down * WallSkirt;
-            Vector3 top = Vector3.up * (WallHeight + WallSkirt);
+            Vector3 visualTop = Vector3.up * (WallHeight + WallSkirt);
+            Vector3 collisionTop = Vector3.up * (WallCollisionHeight + WallSkirt);
 
             for (int i = 0; i < n; i++)
             {
@@ -394,14 +414,32 @@ namespace MarioKart.World
                 Vector3 outerI = innerI + outwardI * WallThickness;
                 Vector3 outerJ = innerJ + outwardJ * WallThickness;
 
-                builder.AddQuad(innerI, innerI + top, innerJ + top, innerJ, -outwardI);     // faces the road
-                builder.AddQuad(outerI, outerI + top, outerJ + top, outerJ, outwardI);      // faces away
-                builder.AddQuad(innerI + top, outerI + top, outerJ + top, innerJ + top, Vector3.up);
+                visual.AddQuad(innerI, innerI + visualTop, innerJ + visualTop, innerJ, -outwardI);     // faces the road
+                visual.AddQuad(outerI, outerI + visualTop, outerJ + visualTop, outerJ, outwardI);      // faces away
+                visual.AddQuad(innerI + visualTop, outerI + visualTop, outerJ + visualTop, innerJ + visualTop, Vector3.up);
+
+                collision.AddQuad(innerI, innerI + collisionTop, innerJ + collisionTop, innerJ, -outwardI);
+                collision.AddQuad(outerI, outerI + collisionTop, outerJ + collisionTop, outerJ, outwardI);
+                collision.AddQuad(innerI + collisionTop, outerI + collisionTop, outerJ + collisionTop, innerJ + collisionTop, Vector3.up);
             }
 
-            var go = CreateMeshObject(root, name, builder, color, withCollider: true, outline: true);
+            var go = CreateMeshObject(root, name, visual, color, withCollider: true, outline: true);
             go.isStatic = true;
             go.AddComponent<TrackBarrier>();
+
+            var collisionGo = CreateColliderOnlyObject(root, name + "_Collision", collision);
+            collisionGo.isStatic = true;
+            collisionGo.AddComponent<TrackBarrier>();
+        }
+
+        private static GameObject CreateColliderOnlyObject(Transform root, string name, MeshBuilder builder)
+        {
+            var go = new GameObject(name);
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.transform.SetParent(root, worldPositionStays: true);
+
+            go.AddComponent<MeshCollider>().sharedMesh = builder.ToMesh(name);
+            return go;
         }
 
         private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider, bool outline = true)

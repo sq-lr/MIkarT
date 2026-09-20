@@ -66,7 +66,7 @@ def test_filler_asset_placement_allows_all_four_values():
     # The model itself allows "landmark" -- the "never unless max_landmarks
     # says otherwise" rule is enforced by ClaudeFillerAssetService.suggest()
     # (prompt + demotion), not by the Pydantic field type. See
-    # docs/decisions/0010-personalize-toggle.md.
+    # docs/decisions/0012-personalize-toggle.md.
     for placement in ("landmark", "roadside", "background", "scattered"):
         FillerAsset(keyword="x", density=0.5, placement=placement)
 

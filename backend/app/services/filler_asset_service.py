@@ -43,7 +43,7 @@ class FillerAsset(BaseModel):
     `placement` becomes objects[].placement. `placement` normally excludes
     "landmark" -- filler is generic, interchangeable clutter by definition,
     never the one centrepiece a landmark is meant to be -- but `suggest()`'s
-    `max_landmarks` can lift that restriction (see docs/decisions/0010-personalize-toggle.md):
+    `max_landmarks` can lift that restriction (see docs/decisions/0012-personalize-toggle.md):
     when personalized (Meshy) generation is turned off, nothing else in the
     world can supply a landmark, so filler is allowed to nominate 1-2.
     """

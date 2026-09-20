@@ -190,7 +190,7 @@ namespace MarioKart.AssetsSystem
             foreach (var placeholder in placeholders)
             {
                 if (placeholder == null) continue; // world was regenerated meanwhile
-                PlaceOver(template, placeholder);
+                PlaceOver(template, placeholder, definition.capMeshToFootprint, definition.maxHorizontalExtent);
             }
         }
 
@@ -239,7 +239,7 @@ namespace MarioKart.AssetsSystem
             cache.StoreMeshTemplate(taskId, template);
         }
 
-        private static void PlaceOver(GameObject template, GameObject placeholder)
+        private static void PlaceOver(GameObject template, GameObject placeholder, bool capToFootprint = true, float maxHorizontalExtent = -1f)
         {
             var placeholderRenderer = placeholder.GetComponent<Renderer>();
             // Match the placeholder's visual height, and rest the mesh's
@@ -247,6 +247,19 @@ namespace MarioKart.AssetsSystem
             // stands placeholders on the ground, with per-instance scale,
             // tilt and sink -- all of which should carry over to the mesh).
             float targetHeight = placeholderRenderer != null ? placeholderRenderer.bounds.size.y : placeholder.transform.localScale.y;
+            // EnvironmentGenerator only reserves ground-plane space (and
+            // clearance from the wall/road) for the placeholder's own
+            // footprint -- a real GLB's width:height ratio is whatever the
+            // library/generator happened to model, so height-matching alone
+            // can make a short-but-wide mesh (a bench, a fence run) balloon
+            // past that reserved footprint and poke into the wall or road.
+            // Capping by whichever of height or footprint is more
+            // restrictive keeps the visible mesh inside what was actually
+            // reserved, at the cost of sometimes ending up shorter than the
+            // placeholder rather than exactly as tall.
+            float targetFootprint = placeholderRenderer != null
+                ? Mathf.Max(placeholderRenderer.bounds.size.x, placeholderRenderer.bounds.size.z)
+                : Mathf.Max(Mathf.Abs(placeholder.transform.localScale.x), Mathf.Abs(placeholder.transform.localScale.z));
             Vector3 groundPoint = placeholder.transform.position;
             if (placeholderRenderer != null) groundPoint.y = placeholderRenderer.bounds.min.y;
 
@@ -265,8 +278,30 @@ namespace MarioKart.AssetsSystem
             var bounds = CombinedBounds(copy);
             if (bounds.HasValue && bounds.Value.size.y > 0.0001f)
             {
-                float scale = targetHeight / bounds.Value.size.y;
-                copy.transform.localScale = new Vector3(mirrored ? -scale : scale, scale, scale);
+                float heightScale = targetHeight / bounds.Value.size.y;
+                float scale = heightScale;
+                if (capToFootprint)
+                {
+                    float meshFootprint = Mathf.Max(bounds.Value.size.x, bounds.Value.size.z);
+                    float footprintScale = meshFootprint > 0.0001f ? targetFootprint / meshFootprint : heightScale;
+                    scale = Mathf.Min(heightScale, footprintScale);
+                }
+
+                if (maxHorizontalExtent > 0f)
+                {
+                    // Non-uniform on purpose: height still hits heightScale
+                    // exactly (guaranteeing the tall minimum regardless of
+                    // this mesh's own proportions), while X/Z are
+                    // independently capped so the mesh can never reach back
+                    // onto the road no matter how wide it naturally is.
+                    float meshFootprint = Mathf.Max(bounds.Value.size.x, bounds.Value.size.z);
+                    float horizontalScale = meshFootprint > 0.0001f ? Mathf.Min(scale, maxHorizontalExtent / meshFootprint) : scale;
+                    copy.transform.localScale = new Vector3(mirrored ? -horizontalScale : horizontalScale, scale, horizontalScale);
+                }
+                else
+                {
+                    copy.transform.localScale = new Vector3(mirrored ? -scale : scale, scale, scale);
+                }
                 var scaled = CombinedBounds(copy).Value;
                 var groundOffset = groundPoint - new Vector3(scaled.center.x, scaled.min.y, scaled.center.z);
                 copy.transform.position += groundOffset;

@@ -391,7 +391,7 @@ namespace MarioKart.EditorTools
         {
             // Off by default: fast/free retrieval-only world unless the
             // player opts into slower, personalized Meshy generation. See
-            // docs/decisions/0010-personalize-toggle.md.
+            // docs/decisions/0012-personalize-toggle.md.
             var go = new GameObject("PersonalizeToggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
             go.transform.SetParent(parent, false);
             SetRect(go.GetComponent<RectTransform>(), Center, position, new Vector2(340f, 42f));

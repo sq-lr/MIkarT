@@ -50,37 +50,49 @@ namespace MarioKart.World
 
         [Header("Counts")]
         [Tooltip("density (0-1) × this × control-point count ≈ scattered instances per type.")]
-        public float densityToCountScale = 1.5f;
+        public float densityToCountScale = 3.5f;
         [Tooltip("Scattered copies of a landmark type, as a fraction of its normal count. 0 = the landmark appears only as landmarks.")]
-        [Range(0f, 1f)] public float landmarkFillerFraction = 0f;
+        [Range(0f, 1f)] public float landmarkFillerFraction = 0.2f;
         public int landmarkCopies = 2;
-        [Tooltip("Horizon copies for a 'background' type.")]
-        public Vector2Int backgroundHorizonCopies = new Vector2Int(3, 6);
         [Tooltip("Horizon copies for a 'scattered' type (keeps the skyline mostly what the VLM called background).")]
-        public Vector2Int scatteredHorizonCopies = new Vector2Int(0, 1);
+        public Vector2Int scatteredHorizonCopies = new Vector2Int(3, 6);
 
         [Header("Placement (metres from the barrier)")]
-        public Vector2 nearBand = new Vector2(2f, 7f);
-        public Vector2 midBand = new Vector2(9f, 18f);
-        public Vector2 horizonBand = new Vector2(80f, 150f);
+        public Vector2 nearBand = new Vector2(1.5f, 5f);
+        public Vector2 midBand = new Vector2(6f, 11f);
+        [Tooltip("How far out 'background' objects sit -- deliberately just past midBand (which itself now tops out at 11m), not out at horizonBand, so they read as an imposing close wall (mountains, a treeline) that cuts off the view almost immediately instead of a distant skyline. Kept narrow (not a wide band like the others) so consecutive copies along the wall stay at a similar depth and reliably overlap.")]
+        public Vector2 backgroundBand = new Vector2(12f, 16f);
+        [Tooltip("Metres between background-wall copies along each shoulder, both sides -- deliberately smaller than backgroundScaleRange so consecutive copies overlap continuously instead of leaving gaps.")]
+        public float backgroundWallInterval = 4f;
+        public Vector2 horizonBand = new Vector2(35f, 65f);
         [Range(0f, 1f)] public float insideLoopChance = 0.35f;
-        public float landmarkDistance = 8f;
+        [Tooltip("Minimum distance a landmark sits off the barrier -- adaptively increased at Spawn time if landmarkScaleRange's footprint needs more room than this (see FootprintFor).")]
+        public float landmarkDistance = 4f;
         [Tooltip("Roadside objects sit this far off the barrier.")]
-        public Vector2 roadsideBand = new Vector2(1f, 3f);
+        public Vector2 roadsideBand = new Vector2(1f, 2.5f);
         [Tooltip("Spacing between roadside objects at density 0 and density 1.")]
-        public Vector2 roadsideIntervalRange = new Vector2(40f, 12f);
+        public Vector2 roadsideIntervalRange = new Vector2(14f, 5f);
 
         [Header("Variation")]
-        public Vector2 fillerScaleRange = new Vector2(0.7f, 1.4f);
-        public Vector2 landmarkScaleRange = new Vector2(2.4f, 3.2f);
-        public Vector2 horizonScaleRange = new Vector2(5f, 8f);
+        public Vector2 fillerScaleRange = new Vector2(1.6f, 2.6f);
+        [Tooltip("Extra scale multiplier for clusters placed in midBand instead of nearBand -- being farther from the road, they need to be bigger to read at the same visual size.")]
+        public float midBandScaleBoost = 1.6f;
+        public Vector2 roadsideScaleRange = new Vector2(1.8f, 2.4f);
+        public Vector2 landmarkScaleRange = new Vector2(6.0f, 9.0f);
+        [Tooltip("Floor on a landmark's vertical size specifically, independent of landmarkScaleRange's (uniform) multiplier -- see backgroundMinHeight for the same idea applied to the background wall.")]
+        public float landmarkMinHeight = 8f;
+        [Tooltip("Large on purpose: at backgroundBand's distance, this is what actually blocks the view instead of just decorating the skyline.")]
+        public Vector2 backgroundScaleRange = new Vector2(14f, 20f);
+        [Tooltip("Floor on the background wall's vertical size specifically, independent of backgroundScaleRange's (uniform) multiplier -- a retrieved mesh that's naturally wide-but-short would otherwise stay short even at a big scale. Non-uniform on purpose: this is a stylized view-blocking wall, not a proportionally-accurate model.")]
+        public float backgroundMinHeight = 16f;
+        public Vector2 horizonScaleRange = new Vector2(4f, 6f);
         public float maxTiltDegrees = 4f;
         public Vector2 sinkRange = new Vector2(0.05f, 0.15f);
         public float hueJitter = 0.03f, saturationJitter = 0.10f, valueJitter = 0.15f;
 
         private const float WallThickness = TrackMeshBuilder.WallThickness;
 
-        private enum Role { Filler, Roadside, Landmark, Horizon }
+        private enum Role { Filler, Roadside, Landmark, Horizon, Background }
 
         // Mirrors the schema enum for objects[].placement.
         private enum Placement { Scattered, Roadside, Background, Landmark }
@@ -119,8 +131,21 @@ namespace MarioKart.World
 
             int typeCount = recipe.objects.Count;
             int landmarksPlaced = 0; // shared so a second landmark type takes the next spot
+            // Deferred: every "background" type shares ONE continuous wall
+            // (see below) so two variants (e.g. "mountain"/"mountain_2" from
+            // the backend's retrieval variety, docs/decisions/0009) actually
+            // alternate along it, instead of each independently laying down
+            // its own full-loop wall that would just double-stack at nearly
+            // the same spots.
+            var backgroundVariants = new List<(AssetDefinition definition, List<GameObject> instances)>();
+            // Grand landmark copies only (not their small scattered-filler
+            // fraction) -- used below to clear away anything they end up
+            // overlapping, now that landmarks are bigger and closer to the
+            // road than the rest of the collision system was tuned for.
+            var landmarkInstances = new List<GameObject>();
             foreach (var entry in recipe.objects)
             {
+                Debug.Log($"[EnvironmentGenerator] {entry.type} - {entry.placement} - {entry.density}");
                 var rng = new WorldRandom(WorldRandom.DeriveSeed(seed, entry.type));
                 var definition = resolver.Resolve(entry);
                 definitions.Add(definition);
@@ -135,7 +160,19 @@ namespace MarioKart.World
                 switch (ParsePlacement(entry))
                 {
                     case Placement.Landmark:
+                        // Same reasoning as the background wall: capping the
+                        // swapped-in mesh to the placeholder's own footprint
+                        // was silently shrinking a real, wide-but-short GLB
+                        // back down below landmarkMinHeight. Also applies to
+                        // this type's small landmarkFillerFraction scattered
+                        // copies below (one AssetDefinition per type), but
+                        // the cap is sized conservatively off landmarkDistance
+                        // so those can't reach the road either.
+                        definition.capMeshToFootprint = false;
+                        definition.maxHorizontalExtent = landmarkDistance * 2f;
+                        int beforeLandmarks = instances.Count;
                         landmarksPlaced += PlaceLandmarks(layout, rng, definition, landmarksPlaced, instances);
+                        for (int i = beforeLandmarks; i < instances.Count; i++) landmarkInstances.Add(instances[i]);
                         PlaceClusters(layout, rng, definition, Mathf.RoundToInt(fillerCount * landmarkFillerFraction), zones, instances);
                         break;
 
@@ -144,7 +181,20 @@ namespace MarioKart.World
                         break;
 
                     case Placement.Background:
-                        PlaceHorizon(layout, rng, definition, skyColor, backgroundHorizonCopies, instances);
+                        // The wall deliberately overlaps instead of
+                        // reserving exclusive footprint (see PlaceBackgroundWall),
+                        // so a retrieved mesh shouldn't be shrunk to fit one.
+                        // It still needs a hard backstop, though: a mesh
+                        // scaled up to hit backgroundMinHeight can end up far
+                        // wider than the placeholder ever was if its native
+                        // proportions are wide-but-short, so cap the real
+                        // mesh's width independently of height at
+                        // backgroundBand's minimum clearance (as a diameter)
+                        // -- it can never reach back onto the road no matter
+                        // how wide the real asset naturally is.
+                        definition.capMeshToFootprint = false;
+                        definition.maxHorizontalExtent = backgroundBand.x * 2f;
+                        backgroundVariants.Add((definition, instances));
                         break;
 
                     default: // Scattered
@@ -152,6 +202,20 @@ namespace MarioKart.World
                         PlaceHorizon(layout, rng, definition, skyColor, scatteredHorizonCopies, instances);
                         break;
                 }
+            }
+
+            if (backgroundVariants.Count > 0)
+            {
+                // A dedicated seed key, not any one variant's -- so adding or
+                // removing a variant doesn't reshuffle other types, matching
+                // every other placement's determinism rule (docs/decisions/0004).
+                var backgroundRng = new WorldRandom(WorldRandom.DeriveSeed(seed, "background_wall"));
+                PlaceBackgroundWall(layout, backgroundRng, backgroundVariants);
+            }
+
+            if (landmarkInstances.Count > 0)
+            {
+                RemoveOverlappingWithLandmarks(landmarkInstances, placeholdersByType);
             }
 
             var config = GameManager.Instance != null ? GameManager.Instance.Config : null;
@@ -208,8 +272,12 @@ namespace MarioKart.World
             {
                 int index = LandmarkSpot(layout, i);
                 Vector3 outward = layout.Outward(index);
-                Vector3 position = layout.Point(index) + outward * (layout.HalfWidth + WallThickness + landmarkDistance);
                 float scale = rng.NextRange(landmarkScaleRange.x, landmarkScaleRange.y);
+                // A big landmark needs more clearance than landmarkDistance
+                // alone guarantees, or its near edge spills back onto the
+                // wall/road (see FootprintFor) -- same fix as roadside/clusters.
+                float distance = Mathf.Max(landmarkDistance, FootprintFor(definition, scale));
+                Vector3 position = layout.Point(index) + outward * (layout.HalfWidth + WallThickness + distance);
                 float yaw = Quaternion.LookRotation(-outward, Vector3.up).eulerAngles.y;
                 var go = Spawn(definition, position, yaw, scale, Role.Landmark, rng, layout);
                 if (go != null)
@@ -228,6 +296,43 @@ namespace MarioKart.World
             if (ordinal == 1) return layout.SharpestBend(avoidIndex: opposite, avoidRadius: 3);
             // Further spots: spread around the loop, avoiding the start line.
             return layout.Wrap(layout.PointCount * (2 * ordinal - 1) / (2 * (ordinal + 1)));
+        }
+
+        /// <summary>
+        /// Landmarks are now big and close enough to the road that they can
+        /// end up overlapping something placed earlier in the generation
+        /// loop (collision avoidance only ever protects a NEW placement from
+        /// EARLIER ones, never the reverse, so nothing already down when a
+        /// landmark was placed knew to leave room for it). Runs once at the
+        /// end, after every other placement (including the background wall)
+        /// -- clears out anything, of any type, whose rendered bounds
+        /// actually intersect a landmark's, so the centrepiece always reads
+        /// clean rather than half-buried in whatever was there first.
+        /// </summary>
+        private static void RemoveOverlappingWithLandmarks(List<GameObject> landmarks, Dictionary<string, List<GameObject>> placeholdersByType)
+        {
+            foreach (var landmark in landmarks)
+            {
+                if (landmark == null) continue;
+                var landmarkRenderer = landmark.GetComponent<Renderer>();
+                if (landmarkRenderer == null) continue;
+                Bounds landmarkBounds = landmarkRenderer.bounds;
+
+                foreach (var list in placeholdersByType.Values)
+                {
+                    for (int i = list.Count - 1; i >= 0; i--)
+                    {
+                        var other = list[i];
+                        if (other == null || other == landmark) continue;
+                        var otherRenderer = other.GetComponent<Renderer>();
+                        if (otherRenderer != null && landmarkBounds.Intersects(otherRenderer.bounds))
+                        {
+                            Destroy(other);
+                            list.RemoveAt(i);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -265,10 +370,16 @@ namespace MarioKart.World
 
                     for (int side = -1; side <= 1; side += 2)
                     {
-                        float across = layout.HalfWidth + WallThickness + rng.NextRange(roadsideBand.x, roadsideBand.y);
+                        // Draw scale before the offset: a big instance needs
+                        // more clearance than roadsideBand's minimum alone
+                        // guarantees, or its near edge spills back onto the
+                        // wall/road (see FootprintFor).
+                        float scale = rng.NextRange(roadsideScaleRange.x, roadsideScaleRange.y);
+                        float minOffset = Mathf.Max(roadsideBand.x, FootprintFor(definition, scale));
+                        float maxOffset = Mathf.Max(minOffset, roadsideBand.y);
+                        float across = layout.HalfWidth + WallThickness + rng.NextRange(minOffset, maxOffset);
                         Vector3 position = centre + outward * (across * side);
                         float yaw = Quaternion.LookRotation(-outward * side, Vector3.up).eulerAngles.y;
-                        float scale = rng.NextRange(0.9f, 1.1f);
                         var go = Spawn(definition, position, yaw, scale, Role.Roadside, rng, layout);
                         if (go != null) instances.Add(go);
                     }
@@ -299,7 +410,8 @@ namespace MarioKart.World
             {
                 int anchor = candidates[rng.NextInt(0, candidates.Count)];
                 float side = rng.NextFloat() < insideLoopChance ? -1f : 1f;
-                Vector2 band = rng.NextFloat() < 0.7f ? nearBand : midBand;
+                bool useMidBand = rng.NextFloat() >= 0.7f;
+                Vector2 band = useMidBand ? midBand : nearBand;
                 float alongSpread = 0.6f * (layout.Point(anchor + 1) - layout.Point(anchor)).magnitude;
 
                 int inCluster = c == clusterCount - 1 ? remaining : Mathf.Min(remaining, rng.NextInt(2, 6));
@@ -307,13 +419,19 @@ namespace MarioKart.World
                 {
                     remaining--;
                     float scale = rng.NextRange(fillerScaleRange.x, fillerScaleRange.y);
+                    if (useMidBand) scale *= midBandScaleBoost;
                     if (rng.NextFloat() < 0.15f) scale *= 1.3f; // the occasional big one
+                    // A big instance needs more clearance than band.x alone
+                    // guarantees, or its near edge spills back onto the
+                    // wall/road (see FootprintFor).
+                    float minOffset = Mathf.Max(band.x, FootprintFor(definition, scale));
+                    float maxOffset = Mathf.Max(minOffset, band.y);
 
                     // Up to a few tries to find a free spot; otherwise skip the instance.
                     for (int attempt = 0; attempt < 6; attempt++)
                     {
                         float along = rng.NextRange(-alongSpread, alongSpread);
-                        float across = layout.HalfWidth + WallThickness + rng.NextRange(band.x, band.y);
+                        float across = layout.HalfWidth + WallThickness + rng.NextRange(minOffset, maxOffset);
                         Vector3 position = layout.Point(anchor) + layout.Tangent(anchor) * along + layout.Outward(anchor) * (across * side);
 
                         var go = Spawn(definition, position, rng.NextRange(0f, 360f), scale, Role.Filler, rng, layout);
@@ -356,9 +474,77 @@ namespace MarioKart.World
             }
         }
 
+        /// <summary>
+        /// A continuous wall lining BOTH sides of the whole loop (mountains,
+        /// a dense treeline) at backgroundBand -- just past midBand, nowhere
+        /// near horizonBand -- so it reads as terrain the road cuts through
+        /// rather than a distant skyline. Marches at backgroundWallInterval
+        /// like PlaceRoadside, but the interval is deliberately smaller than
+        /// backgroundScaleRange so consecutive copies overlap on purpose
+        /// (Spawn's Role.Background case skips the IsFree check for exactly
+        /// this reason -- every other role treats overlap as a bug). Unlike
+        /// PlaceHorizon: covers every zone (a wall with gaps defeats the
+        /// point), and no sky-haze tint -- it's close enough that washing it
+        /// toward the sky colour would look wrong, so it gets a normal
+        /// jittered tint and an outline like everything else in the world.
+        /// </summary>
+        private void PlaceBackgroundWall(TrackLayout layout, WorldRandom rng, List<(AssetDefinition definition, List<GameObject> instances)> variants)
+        {
+            float interval = Mathf.Max(2f, backgroundWallInterval);
+            float distanceSinceLast = interval;
+
+            for (int i = 0; i < layout.PointCount; i++)
+            {
+                Vector3 start = layout.Point(i);
+                Vector3 segment = layout.Point(i + 1) - start;
+                float segmentLength = segment.magnitude;
+                Vector3 direction = segment / Mathf.Max(segmentLength, 0.001f);
+
+                float t = interval - distanceSinceLast;
+                while (t < segmentLength)
+                {
+                    Vector3 centre = start + direction * t;
+                    Vector3 outward = Vector3.Cross(Vector3.up, direction).normalized;
+                    if (Vector3.Dot(outward, layout.Outward(i)) < 0f) outward = -outward;
+
+                    for (int side = -1; side <= 1; side += 2)
+                    {
+                        // Pick which variant occupies this slot -- this is
+                        // what actually mixes two mountain shapes along one
+                        // continuous wall, rather than each variant getting
+                        // its own full pass over the whole loop.
+                        var (definition, instances) = variants[rng.NextInt(0, variants.Count)];
+                        float scale = rng.NextRange(backgroundScaleRange.x, backgroundScaleRange.y);
+                        float across = layout.HalfWidth + WallThickness + rng.NextRange(backgroundBand.x, backgroundBand.y);
+                        Vector3 position = centre + outward * (across * side);
+                        var go = Spawn(definition, position, rng.NextRange(0f, 360f), scale, Role.Background, rng, layout);
+                        if (go != null) instances.Add(go);
+                    }
+                    t += interval;
+                }
+                distanceSinceLast = segmentLength - (t - interval);
+            }
+        }
+
         // ------------------------------------------------------------------
         // Instance creation + variation
         // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Half the instance's footprint (plus a little clearance), given
+        /// its base scale and the role's scale multiplier -- how far an
+        /// instance's edge can reach from its center. Shared by Spawn's own
+        /// overlap check and by PlaceRoadside/PlaceClusters, which need it
+        /// *before* they pick a position: a big instance needs more
+        /// clearance from the wall than the placement band's minimum offset
+        /// alone guarantees, or its near edge spills back onto the wall or
+        /// the road itself instead of just onto whatever's already placed.
+        /// </summary>
+        private static float FootprintFor(AssetDefinition definition, float scaleMultiplier)
+        {
+            Vector3 scale = definition.defaultScale * scaleMultiplier;
+            return Mathf.Max(scale.x, scale.z) * 0.5f + 0.5f;
+        }
 
         /// <summary>
         /// Spawn one placeholder resting on the ground at `position`, with
@@ -377,12 +563,27 @@ namespace MarioKart.World
             position.y = layout.GroundHeightAt(position);
 
             Vector3 scale = definition.defaultScale * scaleMultiplier;
-            float footprint = Mathf.Max(scale.x, scale.z) * 0.5f + 0.5f;
-            if (role != Role.Horizon && !layout.IsFree(position, footprint)) return null;
+            if (role == Role.Background)
+            {
+                // Independent of the uniform scaleMultiplier: a naturally
+                // wide-but-short definition (or, later, retrieved mesh --
+                // see AssetDefinition.capMeshToFootprint) would otherwise
+                // stay short even at a big backgroundScaleRange value.
+                scale.y = Mathf.Max(scale.y, backgroundMinHeight);
+            }
+            else if (role == Role.Landmark)
+            {
+                scale.y = Mathf.Max(scale.y, landmarkMinHeight);
+            }
+            float footprint = FootprintFor(definition, scaleMultiplier);
+            // Horizon and Background are exempt: Horizon is far enough out
+            // that collisions are irrelevant, and Background's whole point
+            // is a continuous overlapping wall -- see PlaceBackgroundWall.
+            if (role != Role.Horizon && role != Role.Background && !layout.IsFree(position, footprint)) return null;
 
             // Variation draws happen in a fixed order so the sequence stays
             // deterministic regardless of which branch spends them.
-            bool organic = role == Role.Filler || role == Role.Horizon; // roadside/landmark stay upright and un-mirrored
+            bool organic = role == Role.Filler || role == Role.Horizon || role == Role.Background; // roadside/landmark stay upright and un-mirrored
             bool mirror = organic && rng.NextFloat() < 0.5f;
             float tiltX = role == Role.Filler ? rng.NextRange(-maxTiltDegrees, maxTiltDegrees) : 0f;
             float tiltZ = role == Role.Filler ? rng.NextRange(-maxTiltDegrees, maxTiltDegrees) : 0f;

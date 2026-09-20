@@ -208,7 +208,17 @@ namespace MarioKart.UI
 
         private void HandleStateChanged(GameState state)
         {
-            panel.SetActive(state == GameState.Input);
+            bool isInput = state == GameState.Input;
+            panel.SetActive(isInput);
+            if (isInput)
+            {
+                // Awake() only forces this off once, the very first time the
+                // panel exists -- without also resetting it here, a toggle
+                // switched on for one round (even by accident; it sits right
+                // above the Generate button) would silently stay on for
+                // every later round too, since nothing else ever clears it.
+                personalizeToggle.isOn = false;
+            }
         }
 
         private void OnChooseImageClicked()
@@ -240,6 +250,9 @@ namespace MarioKart.UI
             string description = string.IsNullOrWhiteSpace(descriptionField.text)
                 ? "a racing world inspired by this photo"
                 : descriptionField.text.Trim();
+            // TEMPORARY diagnostic for the personalize=true-when-unchecked
+            // report -- remove once resolved.
+            Debug.Log($"[ImageUploadUI] personalizeToggle.isOn = {personalizeToggle.isOn} (instance {personalizeToggle.GetInstanceID()}) at Generate click");
             var request = new WorldGenerationRequest(
                 pickedImageBytes,
                 pickedImageFileName,

@@ -83,7 +83,7 @@ class FakeLibraryService(LibraryAssetService):
     def __init__(self):
         self.submitted: list[str] = []
 
-    def submit(self, asset: FillerAsset) -> MeshTask | None:
+    def submit(self, asset: FillerAsset, exclude_ids: frozenset[str] = frozenset()) -> MeshTask | None:
         task_id = f"poly-{asset.keyword}"
         self.submitted.append(task_id)
         return MeshTask(task_id=task_id, object_type=asset.keyword, provider="polypizza")
@@ -297,3 +297,65 @@ def test_generate_world_personalize_defaults_to_false_and_skips_meshy(fake_mesh)
     assert placements["bench"] == "roadside"
     for obj in recipe["objects"]:
         assert obj["asset"]["provider"] == "polypizza"
+
+
+class _RecordingLibraryService(LibraryAssetService):
+    """Records the exclude_ids each submit() call received, so a test can
+    confirm the second background-variant call actually excludes the first
+    match instead of just repeating it."""
+
+    def __init__(self):
+        self.calls: list[frozenset[str]] = []
+
+    def submit(self, asset: FillerAsset, exclude_ids: frozenset[str] = frozenset()) -> MeshTask | None:
+        self.calls.append(exclude_ids)
+        task_id = f"poly-{asset.keyword}-{len(self.calls)}"
+        return MeshTask(task_id=task_id, object_type=asset.keyword, provider="polypizza")
+
+    def get_status(self, task_id):
+        return MeshTaskStatus(status="ready", progress=100)
+
+    def fetch_model(self, task_id):
+        return GLB_BYTES
+
+
+def test_submit_filler_assets_gets_a_second_variant_for_background():
+    from app.api.generate_world import _submit_filler_assets
+
+    library = _RecordingLibraryService()
+    assets = [
+        FillerAsset(keyword="mountain", density=0.2, placement="background"),
+        FillerAsset(keyword="bench", density=0.5, placement="roadside"),
+    ]
+
+    result_assets, result_tasks = _submit_filler_assets(library, assets)
+
+    # background got a second, excluded-first-match submission; roadside didn't.
+    assert [a.keyword for a in result_assets] == ["mountain", "mountain_2", "bench"]
+    assert [t.object_type for t in result_tasks] == ["mountain", "mountain_2", "bench"]
+    assert all(t.provider == "polypizza" for t in result_tasks)
+    assert library.calls[0] == frozenset()  # first mountain search: nothing to exclude yet
+    assert library.calls[1] == frozenset({result_tasks[0].task_id})  # second excludes the first match
+    assert library.calls[2] == frozenset()  # bench: no variant search at all
+
+
+def test_submit_filler_assets_skips_variant_when_no_second_match():
+    from app.api.generate_world import _submit_filler_assets
+
+    class NoSecondMatchLibrary(LibraryAssetService):
+        def submit(self, asset, exclude_ids=frozenset()):
+            if exclude_ids:
+                return None  # only one match exists in this fake catalog
+            return MeshTask(task_id="only-match", object_type=asset.keyword, provider="polypizza")
+
+        def get_status(self, task_id):
+            return MeshTaskStatus(status="ready", progress=100)
+
+        def fetch_model(self, task_id):
+            return GLB_BYTES
+
+    assets = [FillerAsset(keyword="mountain", density=0.2, placement="background")]
+    result_assets, result_tasks = _submit_filler_assets(NoSecondMatchLibrary(), assets)
+
+    assert [a.keyword for a in result_assets] == ["mountain"]
+    assert [t.task_id for t in result_tasks] == ["only-match"]
