@@ -184,6 +184,7 @@ namespace MarioKart.World
         private void ApplyTheme(WorldRecipe recipe)
         {
             var palette = recipe?.palette;
+            string sky = recipe?.world?.sky?.ToLowerInvariant() ?? "sunny";
             ColorUtility.TryParseHtmlString(palette != null && palette.Count > 0 ? palette[0] : "#F4E6C0", out var sunColor);
             ColorUtility.TryParseHtmlString(palette != null && palette.Count > 1 ? palette[1] : "#6B8F4A", out var groundColor);
             ColorUtility.TryParseHtmlString(palette != null && palette.Count > 2 ? palette[2] : "#A8C8DC", out var accent);
@@ -197,8 +198,10 @@ namespace MarioKart.World
             float sunPitch = 38f;
             float sunIntensity = 0.95f;
             Color ambient = new Color(0.62f, 0.66f, 0.58f);
-            Color skyTop = Color.Lerp(new Color(0.55f, 0.73f, 0.88f), accent, 0.25f);
-            Color skyHorizon = GhibliLook.Cream;
+            Color skyTop = new Color(0.059f, 0.561f, 0.839f);
+            Color skyUpperMid = new Color(0.169f, 0.659f, 0.871f);
+            Color skyLowerMid = new Color(0.361f, 0.784f, 0.910f);
+            Color skyHorizon = new Color(0.627f, 0.894f, 0.925f);
             Color fog = new Color(0.78f, 0.84f, 0.78f);
             float fogDensity = 0.0075f;
 
@@ -241,6 +244,28 @@ namespace MarioKart.World
                 skyTop = Color.Lerp(skyTop, new Color(0.62f, 0.68f, 0.72f), 0.4f);
             }
 
+            if (sky == "cloudy")
+            {
+                skyTop = new Color(0.290f, 0.529f, 0.722f);
+                skyUpperMid = new Color(0.435f, 0.639f, 0.780f);
+                skyLowerMid = new Color(0.588f, 0.753f, 0.839f);
+                skyHorizon = new Color(0.761f, 0.871f, 0.902f);
+            }
+            else if (sky == "sunset")
+            {
+                skyTop = new Color(0.231f, 0.329f, 0.502f);
+                skyUpperMid = new Color(0.545f, 0.482f, 0.659f);
+                skyLowerMid = new Color(0.910f, 0.576f, 0.361f);
+                skyHorizon = new Color(1.0f, 0.851f, 0.541f);
+            }
+            else if (sky == "night")
+            {
+                skyTop = new Color(0.059f, 0.118f, 0.302f);
+                skyUpperMid = new Color(0.071f, 0.180f, 0.420f);
+                skyLowerMid = new Color(0.106f, 0.302f, 0.580f);
+                skyHorizon = new Color(0.106f, 0.290f, 0.420f);
+            }
+
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = fog;
@@ -254,31 +279,18 @@ namespace MarioKart.World
                 if (skyboxMaterial != null) Destroy(skyboxMaterial);
                 skyboxMaterial = new Material(skyShader);
                 if (skyboxMaterial.HasProperty("_SkyTop")) skyboxMaterial.SetColor("_SkyTop", skyTop);
+                if (skyboxMaterial.HasProperty("_SkyUpperMid")) skyboxMaterial.SetColor("_SkyUpperMid", skyUpperMid);
+                if (skyboxMaterial.HasProperty("_SkyLowerMid")) skyboxMaterial.SetColor("_SkyLowerMid", skyLowerMid);
                 if (skyboxMaterial.HasProperty("_SkyHorizon")) skyboxMaterial.SetColor("_SkyHorizon", skyHorizon);
-                if (skyboxMaterial.HasProperty("_SkyUpperMid"))
-                {
-                    skyboxMaterial.SetColor("_SkyUpperMid", sky == "sunset"
-                        ? new Color(0.48f, 0.44f, 0.63f)
-                        : sky == "night"
-                            ? new Color(0.06f, 0.18f, 0.42f)
-                            : sky == "cloudy"
-                                ? new Color(0.24f, 0.52f, 0.72f)
-                                : new Color(0.17f, 0.58f, 0.78f));
-                }
-                if (skyboxMaterial.HasProperty("_SkyLowerMid"))
-                {
-                    skyboxMaterial.SetColor("_SkyLowerMid", sky == "sunset"
-                        ? new Color(0.82f, 0.48f, 0.44f)
-                        : sky == "night"
-                            ? new Color(0.10f, 0.30f, 0.58f)
-                            : sky == "cloudy"
-                                ? new Color(0.45f, 0.70f, 0.80f)
-                                : new Color(0.36f, 0.72f, 0.84f));
-                }
                 if (skyboxMaterial.HasProperty("_SkyGround")) skyboxMaterial.SetColor("_SkyGround", groundColor);
                 if (skyboxMaterial.HasProperty("_SkyTint")) skyboxMaterial.SetColor("_SkyTint", skyTop);
                 if (skyboxMaterial.HasProperty("_GroundColor")) skyboxMaterial.SetColor("_GroundColor", groundColor);
                 RenderSettings.skybox = skyboxMaterial;
+                Debug.Log(
+                    $"Sky applied: theme={sky}, material={skyboxMaterial.name}, instance={skyboxMaterial.GetInstanceID()}, " +
+                    $"skyTop={skyboxMaterial.GetColor("_SkyTop")}, upperMid={skyboxMaterial.GetColor("_SkyUpperMid")}, " +
+                    $"lowerMid={skyboxMaterial.GetColor("_SkyLowerMid")}, horizon={skyboxMaterial.GetColor("_SkyHorizon")}, " +
+                    $"renderSettingsSkybox={RenderSettings.skybox.name}");
                 DynamicGI.UpdateEnvironment();
             }
 

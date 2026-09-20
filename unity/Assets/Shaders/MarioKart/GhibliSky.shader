@@ -72,14 +72,24 @@ Shader "MarioKart/GhibliSky"
                 col += (_SunColor.rgb * (sunDisc + sunGlow)) * (1.0 - _StarAmount);
 
                 float moonDot = saturate(dot(d, normalize(_MoonDirection.xyz)));
-                float moonGlow = pow(moonDot, 10.0) * 0.22;
-                float moonDisc = smoothstep(0.998, 0.9995, moonDot) * _StarAmount;
-                col += _MoonColor.rgb * (moonDisc * 1.8 + moonGlow * _StarAmount);
+                float moonOuter = pow(moonDot, 7.0) * 0.12;
+                float moonCorona = pow(moonDot, 24.0) * 0.28;
+                float moonDisc = smoothstep(0.997, 0.9992, moonDot);
+                float moonPulse = 0.96 + 0.04 * sin(_Time.y * 0.3);
+                col += _MoonColor.rgb * (moonOuter + moonCorona + moonDisc * 1.55) * _StarAmount * moonPulse;
 
-                float3 starCell = floor((d + 1.0) * 42.0);
-                float starNoise = frac(sin(dot(starCell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
-                float twinkle = 0.65 + 0.35 * sin(_Time.y * 1.7 + starNoise * 20.0);
-                float star = step(0.985, starNoise) * step(0.05, d.y) * _StarAmount * twinkle;
+                float2 starUv = float2(atan2(d.z, d.x) / 6.2831853 + 0.5, asin(d.y) / 3.1415926 + 0.5);
+                float2 starCell = floor(starUv * float2(32.0, 18.0));
+                float2 cellUv = frac(starUv * float2(32.0, 18.0));
+                float starSeed = frac(sin(dot(starCell, float2(12.9898, 78.233))) * 43758.5453);
+                float2 starCenter = float2(
+                    frac(starSeed * 17.31),
+                    frac(starSeed * 41.73));
+                float starDistance = distance(cellUv, starCenter);
+                float starCore = smoothstep(0.045, 0.0, starDistance);
+                float starHalo = smoothstep(0.16, 0.02, starDistance) * 0.35;
+                float twinkle = 0.7 + 0.3 * sin(_Time.y * (0.5 + starSeed * 1.5) + starSeed * 40.0);
+                float star = (starCore + starHalo) * step(0.78, starSeed) * step(0.05, d.y) * _StarAmount * twinkle;
                 col += float3(0.72, 0.88, 1.0) * star;
                 return float4(col, 1);
             }

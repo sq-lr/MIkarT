@@ -71,12 +71,27 @@ namespace MarioKart.Rendering
                 var cloud = new GameObject($"Cloud_{i}");
                 cloud.transform.SetParent(transform, worldPositionStays: false);
                 cloud.transform.position = pos;
-                CreateBlob(cloud.transform, "Shadow", new Vector3(0f, -sy * 0.18f, 0f),
-                    new Vector3(sx, sy * 0.72f, sz), shadowMat);
-                CreateBlob(cloud.transform, "Highlight", new Vector3(-sx * 0.12f, sy * 0.18f, -sz * 0.08f),
-                    new Vector3(sx * 0.82f, sy * 0.72f, sz * 0.78f), highlightMat);
-                CreateBlob(cloud.transform, "Tower", new Vector3(sx * 0.18f, sy * 0.30f, sz * 0.05f),
-                    new Vector3(sx * 0.48f, sy * 0.68f, sz * 0.48f), highlightMat);
+                int blobCount = 6 + rng.NextInt(0, 7);
+                for (int blobIndex = 0; blobIndex < blobCount; blobIndex++)
+                {
+                    float normalized = blobIndex / (float)(blobCount - 1);
+                    bool topBlob = blobIndex >= blobCount / 2;
+                    float radiusScale = topBlob
+                        ? rng.NextRange(0.65f, 1.25f)
+                        : rng.NextRange(0.28f, 0.72f);
+                    float offsetX = rng.NextRange(-0.62f, 0.62f) * sx;
+                    float offsetZ = rng.NextRange(-0.48f, 0.48f) * sz;
+                    float offsetY = topBlob
+                        ? rng.NextRange(0.05f, 0.42f) * sy
+                        : Mathf.Lerp(-0.42f, 0.12f, normalized) * sy;
+                    var blobScale = new Vector3(
+                        sx * radiusScale * rng.NextRange(0.65f, 1.05f),
+                        sy * radiusScale * rng.NextRange(0.72f, 1.12f),
+                        sz * radiusScale * rng.NextRange(0.65f, 1.05f));
+                    CreateBlob(cloud.transform, $"Blob_{blobIndex}",
+                        new Vector3(offsetX, offsetY, offsetZ), blobScale,
+                        topBlob ? highlightMat : shadowMat);
+                }
             }
         }
 
