@@ -55,6 +55,7 @@ ADRs under `docs/decisions/`.
 
 ```
 /CLAUDE.md              — architecture rules, scope
+/CREDITS.md             — third-party asset + library credits (audio, fonts, runtime 3D, packages)
 /schemas/                — WorldRecipe JSON Schema (the contract)
 /docs/                   — architecture, WorldRecipe reference, dev workflow, ADRs
 /backend/                — FastAPI AI service (mock by default; Claude, Meshy, Poly Pizza optional)
