@@ -145,7 +145,7 @@ namespace MarioKart.World
             var landmarkInstances = new List<GameObject>();
             foreach (var entry in recipe.objects)
             {
-                Debug.Log($"[EnvironmentGenerator] {entry.type} - {entry.placement} - {entry.density}");
+                Debug.Log($"[EnvironmentGenerator] {entry.type} - {entry.placement} - {entry.density} - source={entry.source ?? "none"}");
                 var rng = new WorldRandom(WorldRandom.DeriveSeed(seed, entry.type));
                 var definition = resolver.Resolve(entry);
                 definitions.Add(definition);

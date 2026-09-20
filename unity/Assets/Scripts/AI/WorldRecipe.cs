@@ -52,6 +52,11 @@ namespace MarioKart.AI
         // See EnvironmentGenerator.ParsePlacement.
         public string placement;
         public ObjectAsset asset;
+        // Which extraction call produced this object: "photo", "text", or
+        // "filler". Debug/logging only -- never used for placement or
+        // gameplay decisions. Optional/null for the backend's canned
+        // fallback objects and for DefaultWorldRecipe.
+        public string source;
     }
 
     [Serializable]

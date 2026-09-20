@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MarioKart.Players;
 using MarioKart.Rendering;
 using MarioKart.UI;
 using UnityEngine;
@@ -13,6 +14,12 @@ namespace MarioKart.World
     /// collider-free; the pickup's root SphereCollider is the only trigger.
     /// Sign faces sit in the local XY plane so they face karts coming along
     /// the track; TrackObstacle spins the whole thing about Y.
+    ///
+    /// <see cref="ColorFor"/> and <see cref="BeaconMaterial"/> back
+    /// TrackObstacle's own ground-ring beacon: a continuously pulsing
+    /// colour cue (green/red/yellow) that reads from much further away than
+    /// the sign geometry does, so a pickup is obvious well before a kart is
+    /// close enough to make out its shape.
     /// </summary>
     public static class ObstacleVisuals
     {
@@ -45,6 +52,41 @@ namespace MarioKart.World
                     BuildSpinArrows(visual);
                     break;
             }
+        }
+
+        /// <summary>Canonical colour for each pickup kind: green for go/boost,
+        /// red for stop/paralyze, yellow for caution/spin -- the same
+        /// traffic-light vocabulary as the sign colours above, shared with
+        /// TrackObstacle's ground beacon so both agree.</summary>
+        public static Color ColorFor(ObstacleKind kind)
+        {
+            switch (kind)
+            {
+                case ObstacleKind.Boost: return BoostGreen;
+                case ObstacleKind.Paralyze: return StopRed;
+                default: return SubwayYellow;
+            }
+        }
+
+        private static Texture2D beaconTexture;
+        private static Material beaconMaterial;
+
+        /// <summary>
+        /// One shared, uncoloured ring material for every pickup's beacon
+        /// particle system -- colour comes from each TrackObstacle's own
+        /// colorOverLifetime module (see ColorFor), the same "one shared
+        /// material, colour per emission" pattern KartPickupEffect already
+        /// uses for its ring burst, so 12 simultaneous pickups don't each
+        /// allocate their own texture/material.
+        /// </summary>
+        public static Material BeaconMaterial()
+        {
+            if (beaconMaterial == null)
+            {
+                beaconTexture = KartParticles.Ring(64, innerRadius: 0.4f);
+                beaconMaterial = KartParticles.CreateMaterial("ObstacleBeacon", beaconTexture);
+            }
+            return beaconMaterial;
         }
 
         // ── Boost: green ">>" ─────────────────────────────────────────────

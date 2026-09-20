@@ -30,6 +30,7 @@ namespace MarioKart.Core
         [SerializeField] private RaceManager raceManager;
         [SerializeField] private ResultsUI resultsUI;
         private string requestedSky = "sunny";
+        private bool requestedPersonalize;
 
         public GameConfig Config => config;
         public GameState CurrentState { get; private set; } = GameState.Boot;
@@ -111,6 +112,7 @@ namespace MarioKart.Core
         public void SubmitWorldInput(WorldGenerationRequest request)
         {
             requestedSky = string.IsNullOrEmpty(request.sky) ? "sunny" : request.sky;
+            requestedPersonalize = request.personalize;
             TransitionTo(GameState.Generating);
             SetGenerationStatus("Generating your world...");
             recipeClient.RequestWorldRecipe(request, OnRecipeReady, OnRecipeFailed);
@@ -159,20 +161,32 @@ namespace MarioKart.Core
             // Optionally hold here until the generated meshes have swapped in.
             // The world (with placeholders) already exists behind the
             // Generating screen; only the countdown is deferred.
+            //
+            // personalize=true always waits, with no timeout: the whole
+            // point of that toggle is a world that reflects the actual
+            // photo/description, so racing on unswapped placeholders would
+            // defeat it -- config.waitForGeneratedMeshes/meshWaitTimeoutSeconds
+            // (which exist to let an impatient player skip the wait, or cap
+            // it, for the fast/free non-personalized path) are ignored here.
             var loader = worldGenerator.MeshLoader;
-            if (config.waitForGeneratedMeshes && loader != null && loader.IsLoading)
+            bool shouldWait = requestedPersonalize || config.waitForGeneratedMeshes;
+            if (shouldWait && loader != null && loader.IsLoading)
             {
                 if (meshWait != null) StopCoroutine(meshWait);
-                meshWait = StartCoroutine(WaitForMeshesThenAdvance(loader));
+                meshWait = StartCoroutine(WaitForMeshesThenAdvance(loader, forceNoTimeout: requestedPersonalize));
                 return;
             }
 
             TransitionTo(GameState.WorldReady);
         }
 
-        private IEnumerator WaitForMeshesThenAdvance(MarioKart.AssetsSystem.GeneratedMeshLoader loader)
+        private IEnumerator WaitForMeshesThenAdvance(MarioKart.AssetsSystem.GeneratedMeshLoader loader, bool forceNoTimeout)
         {
-            float deadline = Time.realtimeSinceStartup + config.meshWaitTimeoutSeconds;
+            // No deadline at all when forced: Time.realtimeSinceStartup < float.MaxValue is
+            // always true, so the loop only ever exits via loader.IsLoading turning false.
+            float deadline = forceNoTimeout
+                ? float.MaxValue
+                : Time.realtimeSinceStartup + config.meshWaitTimeoutSeconds;
             while (loader.IsLoading && Time.realtimeSinceStartup < deadline)
             {
                 int percent = Mathf.RoundToInt(loader.Progress * 100f);

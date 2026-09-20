@@ -32,6 +32,9 @@ namespace MarioKart.Core
         // (or failed / timed out), instead of racing on placeholders while
         // they stream in. On timeout the race starts anyway and any mesh
         // that finishes later still swaps in -- the game never gets stuck.
+        // Ignored when the player's "Generate personalized assets" toggle
+        // was on: that request always waits, with no timeout, regardless of
+        // these two values -- see GameManager.BuildWorldAndAdvance.
         public bool waitForGeneratedMeshes = true;
         public float meshWaitTimeoutSeconds = 300f;
 

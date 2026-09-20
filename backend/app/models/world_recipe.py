@@ -26,6 +26,12 @@ _ASSET_PROVIDER_VALUES = {"meshy", "polypizza"}
 # enum in the schema and DetectedObject.placement in vision_service.py.
 PLACEMENT_VALUES = {"landmark", "roadside", "background", "scattered"}
 DEFAULT_PLACEMENT = "scattered"
+# Which extraction call originated an object: the photo (vision), the
+# player's text description, or the generic filler suggester. Mirrors
+# MergeSource in app.services.asset_merge_service. Optional/absent for the
+# canned theme-profile fallback objects (_THEME_PROFILES below), which come
+# from neither extraction call.
+SOURCE_VALUES = {"photo", "text", "filler"}
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -139,6 +145,11 @@ class WorldObjectEntry(BaseModel):
     # Optional: absent when no mesh was generated for this type (mock mesh
     # provider, Meshy submit failure, or the offline DefaultWorldRecipe).
     asset: ObjectAsset | None = None
+    # Optional: which extraction call this object came from (see
+    # SOURCE_VALUES). Absent for the canned theme-profile fallback objects,
+    # which aren't from any extraction call. Debug/logging only -- Unity
+    # doesn't use it for any gameplay/placement decision.
+    source: str | None = None
 
     @field_validator("density")
     @classmethod
@@ -150,6 +161,13 @@ class WorldObjectEntry(BaseModel):
     def _valid_placement(cls, v: str) -> str:
         if v not in PLACEMENT_VALUES:
             raise ValueError(f"placement must be one of {sorted(PLACEMENT_VALUES)}")
+        return v
+
+    @field_validator("source")
+    @classmethod
+    def _valid_source(cls, v: str | None) -> str | None:
+        if v is not None and v not in SOURCE_VALUES:
+            raise ValueError(f"source must be one of {sorted(SOURCE_VALUES)}")
         return v
 
 

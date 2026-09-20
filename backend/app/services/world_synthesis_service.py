@@ -177,7 +177,7 @@ def _objects_from_scene(scene: SceneUnderstanding, mesh_tasks: list[MeshTask]) -
         placement = detected.placement
         if placement == "landmark":
             if landmark_count >= MAX_LANDMARKS:
-                logger.debug("demoting extra landmark %r to %s", detected.label, DEFAULT_PLACEMENT)
+                logger.debug("demoting extra landmark %r (source=photo) to %s", detected.label, DEFAULT_PLACEMENT)
                 placement = DEFAULT_PLACEMENT
             else:
                 landmark_count += 1
@@ -189,6 +189,7 @@ def _objects_from_scene(scene: SceneUnderstanding, mesh_tasks: list[MeshTask]) -
                 density=detected.prominence,
                 placement=placement,
                 asset=ObjectAsset(task_id=task.task_id, provider=task.provider) if task else None,
+                source="photo",
             )
         )
     return entries
@@ -217,14 +218,14 @@ def _objects_from_text_assets(
     seen = set(taken_labels)
     for asset in text_assets:
         if asset.label in seen:
-            logger.info("text asset %r collides with a photo-detected object; skipping", asset.label)
+            logger.info("asset %r (source=text) collides with a photo-detected object; skipping", asset.label)
             continue
         seen.add(asset.label)
 
         placement = asset.placement
         if placement == "landmark":
             if landmark_count >= MAX_LANDMARKS:
-                logger.debug("demoting text asset landmark %r to %s", asset.label, DEFAULT_PLACEMENT)
+                logger.debug("demoting extra landmark %r (source=text) to %s", asset.label, DEFAULT_PLACEMENT)
                 placement = DEFAULT_PLACEMENT
             else:
                 landmark_count += 1
@@ -236,6 +237,7 @@ def _objects_from_text_assets(
                 density=asset.density,
                 placement=placement,
                 asset=ObjectAsset(task_id=task.task_id, provider=task.provider) if task else None,
+                source="text",
             )
         )
     return entries
@@ -268,7 +270,7 @@ def _objects_from_filler_assets(
     seen = set(taken_labels)
     for asset in filler_assets:
         if asset.keyword in seen:
-            logger.info("filler asset %r collides with an existing object; skipping", asset.keyword)
+            logger.info("asset %r (source=filler) collides with an existing object; skipping", asset.keyword)
             continue
         task = task_by_label.get(asset.keyword)
         if task is None:
@@ -278,7 +280,7 @@ def _objects_from_filler_assets(
         placement = asset.placement
         if placement == "landmark":
             if landmark_count >= MAX_LANDMARKS:
-                logger.debug("demoting filler landmark %r to %s", asset.keyword, DEFAULT_PLACEMENT)
+                logger.debug("demoting extra landmark %r (source=filler) to %s", asset.keyword, DEFAULT_PLACEMENT)
                 placement = DEFAULT_PLACEMENT
             else:
                 landmark_count += 1
@@ -289,6 +291,7 @@ def _objects_from_filler_assets(
                 density=asset.density,
                 placement=placement,
                 asset=ObjectAsset(task_id=task.task_id, provider=task.provider),
+                source="filler",
             )
         )
     return entries

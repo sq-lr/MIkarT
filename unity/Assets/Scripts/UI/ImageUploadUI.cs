@@ -303,8 +303,14 @@ namespace MarioKart.UI
             ComicStyle.Place(choose, new Vector2(-460f, -230f), new Vector2(360f, 80f), -3f);
             ComicStyle.StyleButton(chooseImageButton, ComicStyle.Blue, "CHOOSE IMAGE", 36);
 
-            // Form panel: untilted so typing reads well.
-            var formFrame = ComicStyle.AddFrame(root, "FormFrame", new Vector2(400f, 30f), new Vector2(900f, 580f), ComicStyle.White, 0f);
+            // Form panel: untilted so typing reads well. Anchored/sized so
+            // the TOP edge stays put (400, 30 + 580/2 = 320) while the
+            // bottom edge moves down to 400, 6 - 628/2 = -308 -- the
+            // GENERATE! button's own bottom edge sits at -218 - 100/2 =
+            // -268 (previously flush with, or slightly past, the old
+            // frame's -260 bottom edge), so this adds a clean 40px of
+            // breathing room below it instead of clipping the panel.
+            var formFrame = ComicStyle.AddFrame(root, "FormFrame", new Vector2(400f, 6f), new Vector2(900f, 628f), ComicStyle.White, 0f);
 
             var field = descriptionField.GetComponent<RectTransform>();
             field.SetParent(formFrame, false);

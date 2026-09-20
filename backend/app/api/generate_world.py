@@ -6,12 +6,14 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.models.world_recipe import WorldRecipeResponse
+from app.services.asset_merge_service import AssetMergeService, MergeCandidate
 from app.services.filler_asset_service import FillerAsset
 from app.services.library_asset_service import LibraryAssetService
 from app.services.mesh_generation_service import MeshGenerationService, MeshTask
 from app.services.object_cropper import ObjectCrop, crop_objects
 from app.services.providers import get_providers
 from app.services.text_asset_service import ExtractedAsset
+from app.services.vision_service import DetectedObject
 from app.services.world_synthesis_service import MAX_LANDMARKS
 
 logger = logging.getLogger(__name__)
@@ -90,12 +92,31 @@ async def generate_world(
         if sky == "indoor":
             filler_candidates = _indoor_background(filler_candidates)
 
-        # 2. Cut each detected object out of the source image -- skipped
+        # 2. personalize=True pulls from three independent sources (photo,
+        #    text, filler) that never saw each other's suggestions, so the
+        #    combined pool can have competing "background"/"landmark"
+        #    candidates with no reconciliation. Ask one more (small, fast)
+        #    Claude call to decide the actual final composition before
+        #    anything is submitted to Meshy/the library, so a candidate it
+        #    drops never costs a wasted call. personalize=False skips this
+        #    entirely: filler alone already stages its own single
+        #    background/landmark/fill-the-rest composition in one call, so
+        #    there's nothing to merge across sources.
+        if personalize:
+            scene.detected_objects, key_assets, filler_candidates = _merge_assets(
+                providers.asset_merge,
+                scene.detected_objects,
+                key_assets,
+                filler_candidates,
+                providers.max_assets_per_world,
+            )
+
+        # 3. Cut each detected object out of the source image -- skipped
         #    entirely when not personalizing, since nothing will be submitted
         #    to Meshy for them anyway.
         crops = crop_objects(image_bytes, scene.detected_objects, providers.max_objects_per_world) if personalize else []
 
-        # 3. Kick off mesh generation, one submission at a time -- image crops
+        # 4. Kick off mesh generation, one submission at a time -- image crops
         #    then text assets (both empty when not personalizing), then a
         #    library search per filler keyword. Unity polls /assets/{task_id}
         #    afterwards. A failed submit only costs that object its mesh (it
@@ -106,7 +127,7 @@ async def generate_world(
         for task in image_mesh_tasks + text_mesh_tasks + filler_mesh_tasks:
             providers.registry.add(task)
 
-        # 4. Assemble the recipe; objects carry their task handles.
+        # 5. Assemble the recipe; objects carry their task handles.
         recipe = providers.synthesis.synthesize(
             scene,
             description,
@@ -125,6 +146,91 @@ async def generate_world(
         raise HTTPException(status_code=500, detail="world generation failed")
 
     return WorldRecipeResponse(world_recipe=recipe)
+
+
+def _merge_assets(
+    merge_service: AssetMergeService,
+    photo_objects: list[DetectedObject],
+    text_objects: list[ExtractedAsset],
+    filler_objects: list[FillerAsset],
+    max_assets: int,
+) -> tuple[list[DetectedObject], list[ExtractedAsset], list[FillerAsset]]:
+    """Ask the merge service for the final landmark/roadside/scattered
+    composition across all three extraction sources, then filter and
+    re-place each source's own list to match. Candidates are addressed by a
+    shared index (photo, then text, then filler) so the merge service only
+    has to hand back keep/placement decisions -- every other field (bbox,
+    prompt, keyword, ...) is left untouched, since only the source that
+    produced an object knows how to submit it for a mesh.
+
+    "background" is hardcoded to always be filler's candidate, never left to
+    the merge call to arbitrate: filler_asset_extraction always suggests
+    exactly one (see its prompt's BACKGROUND step), so a photo/text object
+    that also happens to say "background" (a skyline visible in the photo,
+    say) is demoted to "scattered" before the merge ever runs -- it was
+    never eligible for the slot -- and filler's own background candidate(s)
+    are excluded from the candidate pool entirely and always kept, unchanged,
+    in the result. This removes an entire failure mode (the merge picking a
+    less-fitting photo/text "background" over filler's, or -- worse --
+    picking none) at zero cost, since filler's suggestion is guaranteed to
+    exist and was already designed to answer exactly this question.
+
+    On any failure (including an empty result covering nothing), each
+    source's own list is returned unchanged -- world_synthesis_service's
+    existing per-source demotion/truncation logic is the backstop either
+    way, so a broken merge call only costs its own curation, never the
+    world."""
+    for obj in photo_objects:
+        if obj.placement == "background":
+            obj.placement = "scattered"
+    for asset in text_objects:
+        if asset.placement == "background":
+            asset.placement = "scattered"
+
+    filler_background = [a for a in filler_objects if a.placement == "background"]
+    filler_mergeable = [a for a in filler_objects if a.placement != "background"]
+
+    candidates: list[MergeCandidate] = []
+    for i, obj in enumerate(photo_objects):
+        candidates.append(MergeCandidate(index=i, source="photo", label=obj.label, placement=obj.placement, density=obj.prominence))
+    text_start = len(photo_objects)
+    for i, asset in enumerate(text_objects):
+        candidates.append(
+            MergeCandidate(index=text_start + i, source="text", label=asset.label, placement=asset.placement, density=asset.density)
+        )
+    filler_start = text_start + len(text_objects)
+    for i, asset in enumerate(filler_mergeable):
+        candidates.append(
+            MergeCandidate(
+                index=filler_start + i, source="filler", label=asset.keyword, placement=asset.placement, density=asset.density
+            )
+        )
+
+    if not candidates:
+        return photo_objects, text_objects, filler_objects
+
+    try:
+        result = merge_service.merge(candidates, max_assets)
+    except Exception:
+        logger.exception("asset merge failed; keeping each source's own placement unchanged")
+        return photo_objects, text_objects, filler_objects
+
+    by_index = {d.index: d for d in result.decisions}
+
+    def apply(objs: list, start: int) -> list:
+        kept = []
+        for i, obj in enumerate(objs):
+            decision = by_index.get(start + i)
+            if decision is None or not decision.keep:
+                continue
+            obj.placement = decision.placement
+            kept.append(obj)
+        return kept
+
+    new_photo = apply(photo_objects, 0)
+    new_text = apply(text_objects, text_start)
+    new_filler = filler_background + apply(filler_mergeable, filler_start)
+    return new_photo, new_text, new_filler
 
 
 def _submit_mesh_tasks(

@@ -105,7 +105,7 @@ namespace MarioKart.World
             BuildVisual(go.transform, kind);
 
             var obstacle = go.AddComponent<TrackObstacle>();
-            obstacle.Configure(kind, rng.NextFloat() * Mathf.PI * 2f, this);
+            obstacle.Configure(kind, rng.NextFloat() * Mathf.PI * 2f, this, Height);
             return go;
         }
 

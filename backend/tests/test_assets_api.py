@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import providers as providers_module
+from app.services.asset_merge_service import AssetMergeResult, AssetMergeService, MergeCandidate, MergeDecision, MockAssetMergeService
 from app.services.library_asset_service import LibraryAssetService, MockLibraryAssetService
 from app.services.filler_asset_service import FillerAsset, FillerAssetExtraction, FillerAssetService, MockFillerAssetService
 from app.services.mesh_generation_service import MeshGenerationService, MeshTask, MeshTaskRegistry, MeshTaskStatus
@@ -105,6 +106,7 @@ def fake_mesh():
             synthesis=MockWorldSynthesisService(),
             text_assets=MockTextAssetService(),
             filler_assets=MockFillerAssetService(),
+            asset_merge=MockAssetMergeService(),
             library=MockLibraryAssetService(),
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
@@ -194,6 +196,7 @@ def test_generate_world_includes_text_extracted_assets_with_handles(fake_mesh):
             synthesis=MockWorldSynthesisService(),
             text_assets=text_assets,
             filler_assets=MockFillerAssetService(),
+            asset_merge=MockAssetMergeService(),
             library=MockLibraryAssetService(),
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
@@ -226,6 +229,7 @@ def test_text_extraction_failure_does_not_fail_world(fake_mesh):
             synthesis=MockWorldSynthesisService(),
             text_assets=FakeTextAssetService(RuntimeError("claude down")),
             filler_assets=MockFillerAssetService(),
+            asset_merge=MockAssetMergeService(),
             library=MockLibraryAssetService(),
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
@@ -265,6 +269,7 @@ def test_generate_world_personalize_defaults_to_false_and_skips_meshy(fake_mesh)
             synthesis=MockWorldSynthesisService(),
             text_assets=text_assets,
             filler_assets=filler,
+            asset_merge=MockAssetMergeService(),
             library=library,
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
@@ -359,3 +364,213 @@ def test_submit_filler_assets_skips_variant_when_no_second_match():
 
     assert [a.keyword for a in result_assets] == ["mountain"]
     assert [t.task_id for t in result_tasks] == ["only-match"]
+
+
+class FakeAssetMergeService(AssetMergeService):
+    """Records every candidate list it was called with, and demotes/drops
+    exactly what `decide` says by index -- lets a test script a specific
+    merge outcome without touching the real Claude call."""
+
+    def __init__(self, decide):
+        self.decide = decide
+        self.calls: list[list[MergeCandidate]] = []
+
+    def merge(self, candidates: list[MergeCandidate], max_assets: int) -> AssetMergeResult:
+        self.calls.append(candidates)
+        return AssetMergeResult(decisions=[self.decide(c) for c in candidates])
+
+
+def test_merge_assets_applies_decisions_and_never_touches_unrelated_fields():
+    from app.services.filler_asset_service import FillerAsset
+    from app.services.text_asset_service import ExtractedAsset
+    from app.services.vision_service import DetectedObject
+    from app.api.generate_world import _merge_assets
+
+    photo = [DetectedObject(label="mountain", bbox=[0, 0, 1, 1], prominence=0.5, placement="background")]
+    text = [ExtractedAsset(label="dragon_statue", prompt="a stone dragon", density=0.1, placement="landmark")]
+    filler = [
+        FillerAsset(keyword="cliff", density=0.2, placement="background"),
+        FillerAsset(keyword="crate", density=0.3, placement="scattered"),
+        FillerAsset(keyword="bench", density=0.5, placement="roadside"),
+    ]
+
+    def decide(candidate: MergeCandidate) -> MergeDecision:
+        if candidate.label == "crate":
+            return MergeDecision(index=candidate.index, keep=False, placement=candidate.placement)
+        return MergeDecision(index=candidate.index, keep=True, placement=candidate.placement)
+
+    merge_service = FakeAssetMergeService(decide)
+    new_photo, new_text, new_filler = _merge_assets(merge_service, photo, text, filler, max_assets=12)
+
+    # Photo's "background" tag is demoted to "scattered" before the merge
+    # ever runs -- background is hardcoded to filler's own candidate, so
+    # photo/text are never eligible for it.
+    assert [(o.label, o.placement) for o in new_photo] == [("mountain", "scattered")]
+    assert new_photo[0].bbox == [0, 0, 1, 1]  # untouched field survives the merge
+    assert [o.label for o in new_text] == ["dragon_statue"]
+    assert new_text[0].prompt == "a stone dragon"  # untouched field survives the merge
+    # "cliff" (filler's background candidate) is always kept, unconditionally,
+    # and never even reaches the merge call; "crate" was dropped by the
+    # merge; "bench" was kept by the merge.
+    assert [(o.keyword, o.placement) for o in new_filler] == [("cliff", "background"), ("bench", "roadside")]
+
+    call = merge_service.calls[0]
+    # "cliff" never appears here: it's excluded from the candidate pool.
+    assert [(c.source, c.label, c.placement) for c in call] == [
+        ("photo", "mountain", "scattered"),
+        ("text", "dragon_statue", "landmark"),
+        ("filler", "crate", "scattered"),
+        ("filler", "bench", "roadside"),
+    ]
+
+
+def test_merge_assets_falls_back_unchanged_on_merge_failure():
+    from app.services.filler_asset_service import FillerAsset
+    from app.services.vision_service import DetectedObject
+    from app.api.generate_world import _merge_assets
+
+    photo = [DetectedObject(label="mountain", bbox=[0, 0, 1, 1], prominence=0.5, placement="background")]
+    filler = [FillerAsset(keyword="cliff", density=0.2, placement="background")]
+
+    class BoomMergeService(AssetMergeService):
+        def merge(self, candidates, max_assets):
+            raise RuntimeError("claude down")
+
+    new_photo, new_text, new_filler = _merge_assets(BoomMergeService(), photo, [], filler, max_assets=12)
+
+    # The background hardcoding (demote photo/text, always keep filler's) is
+    # unconditional -- applied before the merge call is even attempted -- so
+    # it still holds even when the merge call itself fails.
+    assert [(o.label, o.placement) for o in new_photo] == [("mountain", "scattered")]
+    assert new_text == []
+    assert [(o.keyword, o.placement) for o in new_filler] == [("cliff", "background")]
+
+
+def test_merge_assets_hardcodes_background_to_filler_even_when_photo_also_claims_it():
+    from app.services.filler_asset_service import FillerAsset
+    from app.services.vision_service import DetectedObject
+    from app.api.generate_world import _merge_assets
+
+    # Photo also detected something it thinks is "background" -- the merge
+    # should never get a say in this: filler's candidate always wins, and
+    # photo's is demoted before the merge call ever sees a candidate list.
+    photo = [DetectedObject(label="mountain_range", bbox=[0, 0, 1, 1], prominence=0.6, placement="background")]
+    filler = [FillerAsset(keyword="cliff", density=0.2, placement="background")]
+
+    merge_service = FakeAssetMergeService(lambda c: MergeDecision(index=c.index, keep=True, placement=c.placement))
+    new_photo, new_text, new_filler = _merge_assets(merge_service, photo, [], filler, max_assets=12)
+
+    assert [(o.label, o.placement) for o in new_photo] == [("mountain_range", "scattered")]
+    assert [(o.keyword, o.placement) for o in new_filler] == [("cliff", "background")]
+    # "cliff" was never even offered to the merge call.
+    assert all(c.label != "cliff" for c in merge_service.calls[0])
+
+
+def test_merge_assets_skips_the_call_with_no_candidates():
+    from app.api.generate_world import _merge_assets
+
+    merge_service = FakeAssetMergeService(lambda c: MergeDecision(index=c.index, keep=True, placement=c.placement))
+    result = _merge_assets(merge_service, [], [], [], max_assets=12)
+
+    assert result == ([], [], [])
+    assert merge_service.calls == []
+
+
+def test_generate_world_personalize_true_runs_asset_merge_before_submission(fake_mesh):
+    from app.services.vision_service import MockVisionService
+
+    text_assets = FakeTextAssetService(
+        TextAssetExtraction(key_assets=[ExtractedAsset(label="whale_statue", prompt="a giant stone whale", density=0.2)])
+    )
+    filler = FakeFillerAssetService(
+        FillerAssetExtraction(
+            filler_assets=[
+                FillerAsset(keyword="cliff", density=0.2, placement="background"),
+                FillerAsset(keyword="crate", density=0.3, placement="scattered"),
+            ]
+        )
+    )
+    library = FakeLibraryService()
+
+    def decide(candidate: MergeCandidate) -> MergeDecision:
+        # Drop the (non-background) filler candidate entirely -- proves a
+        # merge-rejected candidate never reaches mesh/library submission.
+        if candidate.label == "crate":
+            return MergeDecision(index=candidate.index, keep=False, placement=candidate.placement)
+        return MergeDecision(index=candidate.index, keep=True, placement=candidate.placement)
+
+    merge_service = FakeAssetMergeService(decide)
+    providers_module.override(
+        providers_module.Providers(
+            vision=MockVisionService(),
+            mesh=fake_mesh,
+            synthesis=MockWorldSynthesisService(),
+            text_assets=text_assets,
+            filler_assets=filler,
+            asset_merge=merge_service,
+            library=library,
+            registry=MeshTaskRegistry(),
+            max_objects_per_world=4,
+            max_text_assets_per_world=2,
+            max_filler_assets_per_world=2,
+            max_assets_per_world=12,
+        )
+    )
+    client = TestClient(app)
+    response = client.post(
+        "/generate-world",
+        files={"image": ("t.png", make_png(), "image/png")},
+        data={"description": "a forest", "personalize": "true"},
+    )
+
+    assert response.status_code == 200
+    recipe = response.json()["world_recipe"]
+    jsonschema.validate(recipe, _load_schema())
+    assert len(merge_service.calls) == 1
+    # "cliff" is filler's background candidate: hardcoded to always survive,
+    # never even sent to the merge call, so it's still in the final recipe.
+    assert "cliff" in [obj["type"] for obj in recipe["objects"]]
+    # "crate" is a real merge decision (rejected) -- proves rejection still
+    # prevents submission for a non-background candidate.
+    assert "crate" not in [obj["type"] for obj in recipe["objects"]]
+    # "cliff" is submitted twice (base + a second wall-variant search, since
+    # it's a "background" keyword -- see _submit_filler_assets); "crate"
+    # never reaches the library at all since the merge dropped it first.
+    assert library.submitted == ["poly-cliff", "poly-cliff"]
+
+
+def test_generate_world_personalize_false_never_runs_asset_merge():
+    from app.services.vision_service import MockVisionService
+
+    def decide(candidate):
+        raise AssertionError("asset merge should never run when personalize=False")
+
+    merge_service = FakeAssetMergeService(decide)
+    filler = FakeFillerAssetService(
+        FillerAssetExtraction(filler_assets=[FillerAsset(keyword="bench", density=0.5, placement="roadside")])
+    )
+    providers_module.override(
+        providers_module.Providers(
+            vision=MockVisionService(),
+            mesh=FakeMeshService(),
+            synthesis=MockWorldSynthesisService(),
+            text_assets=MockTextAssetService(),
+            filler_assets=filler,
+            asset_merge=merge_service,
+            library=FakeLibraryService(),
+            registry=MeshTaskRegistry(),
+            max_objects_per_world=4,
+            max_text_assets_per_world=2,
+            max_filler_assets_per_world=2,
+            max_assets_per_world=12,
+        )
+    )
+    client = TestClient(app)
+    response = client.post(
+        "/generate-world",
+        files={"image": ("t.png", make_png(), "image/png")},
+        data={"description": "a forest"},
+    )
+
+    assert response.status_code == 200
+    assert merge_service.calls == []

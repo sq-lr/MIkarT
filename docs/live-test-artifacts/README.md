@@ -89,3 +89,24 @@ self-contained under `backend/tests/`.
   path alone would have cost. Isolating text-to-3d cost alone would need a
   way to skip image submission entirely (e.g. a temporary
   `MAX_OBJECTS_PER_WORLD=0`), which wasn't done here.
+
+- `image-to-3d-merge.txt` — live test of the personalize=true final-
+  composition merge (`docs/decisions/0014-asset-merge-final-composition.md`):
+  `AI_PROVIDER=claude`, `TEXT_ASSET_PROVIDER=claude`,
+  `FILLER_ASSET_PROVIDER=claude`, `ASSET_MERGE_PROVIDER=claude`, no mesh/
+  library submission. Ran `object_extraction`, `text_asset_extraction`, and
+  `filler_asset_extraction` (`max_landmarks=0`, as personalize=true always
+  passes) against `unity/Assets/Resources/tree_image.jpg` + description
+  `"jungle"`, then `ClaudeAssetMergeService.merge()` over all 15 combined
+  candidates (3 photo, 0 text, 12 filler); each console line is annotated
+  with which of the three sources produced it (`source=photo/text/filler`),
+  the same field the merge call itself reasons over. Confirms the merge
+  works end-to-end against the real API: it picked the one filler
+  `"background"` candidate as-is, correctly preferred the photo-grounded
+  `broadleaf_tree` over any filler candidate for the single `"landmark"`
+  slot (filler can't even propose one when personalize=true), and dropped 5
+  of the 15 candidates (`vine`, `tree_stump`, `log`, `torch`,
+  `wooden_crate`) as redundant against the jungle-floor vegetation and
+  roadside props it kept instead — real curation, not just relabeling.
+  (Claude's extraction/merge calls aren't deterministic — a rerun landed on
+  slightly different candidates/drops than the first pass, both valid.)

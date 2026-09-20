@@ -116,6 +116,11 @@
             "type": "string",
             "enum": ["landmark", "roadside", "background", "scattered"]
           },
+          "source": {
+            "description": "Which extraction call produced this object: 'photo' (the vision model, from the uploaded image), 'text' (the text-asset extractor, from the player's description), or 'filler' (the generic filler suggester / library retrieval). Debug/logging only -- Unity does not use it for any placement or gameplay decision. Optional/null for the canned theme-profile fallback objects used when nothing was detected. Added backwards-compatibly (version stays 1).",
+            "type": ["string", "null"],
+            "enum": ["photo", "text", "filler", null]
+          },
           "asset": {
             "description": "Optional handle to an asynchronously generated 3D mesh for this object type. Unity polls GET /assets/{task_id} and swaps the GLB in over its placeholder when ready. Absent/null when no mesh was requested (mock provider, offline fallback) or the submit failed -- Unity then keeps the primitive placeholder.",
             "type": ["object", "null"],

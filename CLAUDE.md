@@ -76,16 +76,32 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   (including up to 2 landmarks) is sourced from library retrieval instead,
   with filler prompted to translate what's actually in the photo/text into
   generic search terms before rounding out with unrelated filler — see
-  docs/decisions/0012-personalize-toggle.md
+  docs/decisions/0012-personalize-toggle.md. When personalize=True, the
+  photo/text/filler extraction results (which never see each other's
+  suggestions) are reconciled by one more Claude call
+  (`AssetMergeService`) before anything is submitted to Meshy/the library,
+  picking the actual final composition (at most 2 landmarks, everything
+  else roadside/scattered) instead of the naive first-come-first-served
+  demotion — mock by default (`ASSET_MERGE_PROVIDER`). The single
+  `"background"` slot is hardcoded to always be filler's own candidate
+  (guaranteed to exist) rather than left to the merge call, so it's never
+  at the mercy of whether the photo/text sources happened to detect a
+  skyline — see docs/decisions/0014-asset-merge-final-composition.md
 ✓ Async mesh delivery: the world is built on primitive placeholders and
   generated meshes swap in when ready (placeholders stay if generation
   fails). By default the Generating screen waits for the meshes, with a
   timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
-  turn it off to race immediately while they stream in
+  turn it off to race immediately while they stream in. When the player's
+  "Generate personalized assets" toggle was on, this wait is not optional:
+  the screen always waits, with no timeout, regardless of those two
+  settings, since racing on unswapped placeholders would defeat the point
+  of asking for a personalized world
 ✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
   reshuffled on the racing line each world generation, drawn as runtime-built
   signs (green `>>`, a STOP sign, Subway-style opposing arrows —
-  `World/ObstacleVisuals.cs`)
+  `World/ObstacleVisuals.cs`), each also pulsing a colour-coded ground-ring
+  beacon (green/red/yellow) so it reads from further away than the sign
+  shape alone (`World/TrackObstacle.cs`'s `BuildBeacon`)
 ✓ Cel-shaded look on everything (placeholders, track, karts, generated
   meshes), with the shadow band and rim light driven by the recipe palette
   (`GameConfig.toonShading`, `Assets/Scripts/Rendering/ToonStyle.cs` — see

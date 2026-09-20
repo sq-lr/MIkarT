@@ -625,9 +625,15 @@ namespace MarioKart.UI
             if (toggle == null) return;
             var strip = toggle.GetComponent<Image>();
             if (strip == null) strip = toggle.gameObject.AddComponent<Image>();
-            strip.sprite = Frame();
-            strip.type = Image.Type.Sliced;
-            strip.color = Paper;
+            // Flat, unsliced dark fill with a plain WHITE label below --
+            // guaranteed contrast, no dependency on Frame()'s 9-slice sprite
+            // rendering correctly on a strip this thin (that was the actual
+            // bug: a light "Paper" fill with dark "Ink" text is only
+            // readable if the sliced sprite's border math renders the fill
+            // as light in the first place, which it wasn't).
+            strip.sprite = null;
+            strip.type = Image.Type.Simple;
+            strip.color = new Color(0.14f, 0.14f, 0.18f, 0.95f);
             strip.raycastTarget = true;
 
             var box = MakeImage("Box", toggle.transform, Frame(), White, Image.Type.Sliced);
@@ -657,9 +663,9 @@ namespace MarioKart.UI
             check.canvasRenderer.SetAlpha(toggle.isOn ? 1f : 0f);
 
             var text = toggle.transform.Find("Label")?.GetComponent<Text>();
-            if (text == null) text = MakeLabel("Label", toggle.transform, label ?? "", 24, Ink, body: true, align: TextAnchor.MiddleLeft);
+            if (text == null) text = MakeLabel("Label", toggle.transform, label ?? "", 24, White, body: true, align: TextAnchor.MiddleLeft);
             if (label != null) text.text = label;
-            RestyleLabel(text, 24, Ink, body: true);
+            RestyleLabel(text, 24, White, body: true);
             text.alignment = TextAnchor.MiddleLeft;
             text.rectTransform.anchorMin = Vector2.zero;
             text.rectTransform.anchorMax = Vector2.one;

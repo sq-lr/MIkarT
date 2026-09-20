@@ -1,0 +1,279 @@
+Live test: personalize=true pipeline's three independent extraction calls
+(object_extraction, text_asset_extraction, filler_asset_extraction) run
+against the same photo+description, followed by the new final-composition
+merge call (ClaudeAssetMergeService) -- see
+docs/decisions/0014-asset-merge-final-composition.md.
+
+Only the three extraction calls and the merge call were exercised; no
+mesh/library submission (Meshy/Poly Pizza) was performed. Each asset's
+console line below is annotated with which of the three sources produced
+it, since that's exactly the field (`MergeCandidate.source`) the merge call
+reasons over.
+====================================================================================================
+
+Input image: unity/Assets/Resources/tree_image.jpg (42174 bytes)
+Input description: 'jungle'
+personalize: true (filler_max_landmarks=0, since photo/text may supply landmarks)
+max_objects: 4, max_text_assets: 2, max_filler_assets: 12, max_assets_per_world: 12
+
+--- 1. object_extraction (photo) -> SceneUnderstanding ---
+{
+  "dominant_colors": [
+    "#1565C0",
+    "#4CAF2A",
+    "#8BC34A",
+    "#E8DC3C",
+    "#2E7D32"
+  ],
+  "brightness": 0.74,
+  "tags": [
+    "field",
+    "tree",
+    "countryside",
+    "meadow",
+    "sky",
+    "spring",
+    "rural",
+    "jungle"
+  ],
+  "track_surface": "dirt",
+  "mood": "chill",
+  "detected_objects": [
+    {
+      "label": "broadleaf_tree",
+      "bbox": [0.13, 0.13, 0.48, 0.71],
+      "prominence": 0.6,
+      "placement": "landmark"
+    },
+    {
+      "label": "grass_tuft",
+      "bbox": [0.0, 0.85, 0.16, 0.12],
+      "prominence": 0.5,
+      "placement": "scattered"
+    },
+    {
+      "label": "yellow_flower_bush",
+      "bbox": [0.62, 0.77, 0.14, 0.06],
+      "prominence": 0.4,
+      "placement": "scattered"
+    }
+  ]
+}
+  [source=photo] 'broadleaf_tree' -> placement='landmark'
+  [source=photo] 'grass_tuft' -> placement='scattered'
+  [source=photo] 'yellow_flower_bush' -> placement='scattered'
+----------------------------------------------------------------------------------------------------
+
+--- 2. text_asset_extraction (text) -> TextAssetExtraction ---
+{
+  "key_assets": []
+}
+
+Empty as expected: "jungle" is a mood/terrain word, not a distinctive named
+object, and the prompt explicitly asks for an empty list rather than
+inventing filler in that case. (No [source=text] lines: nothing to log.)
+----------------------------------------------------------------------------------------------------
+
+--- 3. filler_asset_extraction (filler, max_landmarks=0) -> FillerAssetExtraction ---
+{
+  "filler_assets": [
+    {
+      "keyword": "palm_tree",
+      "density": 0.15,
+      "placement": "background"
+    },
+    {
+      "keyword": "fern",
+      "density": 0.6,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "bush",
+      "density": 0.55,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "rock",
+      "density": 0.4,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "vine",
+      "density": 0.35,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "tree_stump",
+      "density": 0.3,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "log",
+      "density": 0.3,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "tall_grass",
+      "density": 0.6,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "bamboo",
+      "density": 0.45,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "wooden_fence",
+      "density": 0.35,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "torch",
+      "density": 0.3,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "wooden_crate",
+      "density": 0.25,
+      "placement": "scattered"
+    }
+  ],
+  "ground_color": "#2f5233"
+}
+  [source=filler] 'palm_tree' -> placement='background'
+  [source=filler] 'fern' -> placement='scattered'
+  [source=filler] 'bush' -> placement='scattered'
+  [source=filler] 'rock' -> placement='scattered'
+  [source=filler] 'vine' -> placement='scattered'
+  [source=filler] 'tree_stump' -> placement='scattered'
+  [source=filler] 'log' -> placement='scattered'
+  [source=filler] 'tall_grass' -> placement='scattered'
+  [source=filler] 'bamboo' -> placement='roadside'
+  [source=filler] 'wooden_fence' -> placement='roadside'
+  [source=filler] 'torch' -> placement='roadside'
+  [source=filler] 'wooden_crate' -> placement='scattered'
+----------------------------------------------------------------------------------------------------
+
+--- 4. Combined candidate pool sent to the merge call (15 total: 3 photo + 0 text + 12 filler) ---
+[
+  { "index": 0, "source": "photo", "label": "broadleaf_tree", "placement": "landmark", "density": 0.6 },
+  { "index": 1, "source": "photo", "label": "grass_tuft", "placement": "scattered", "density": 0.5 },
+  { "index": 2, "source": "photo", "label": "yellow_flower_bush", "placement": "scattered", "density": 0.4 },
+  { "index": 3, "source": "filler", "label": "palm_tree", "placement": "background", "density": 0.15 },
+  { "index": 4, "source": "filler", "label": "fern", "placement": "scattered", "density": 0.6 },
+  { "index": 5, "source": "filler", "label": "bush", "placement": "scattered", "density": 0.55 },
+  { "index": 6, "source": "filler", "label": "rock", "placement": "scattered", "density": 0.4 },
+  { "index": 7, "source": "filler", "label": "vine", "placement": "scattered", "density": 0.35 },
+  { "index": 8, "source": "filler", "label": "tree_stump", "placement": "scattered", "density": 0.3 },
+  { "index": 9, "source": "filler", "label": "log", "placement": "scattered", "density": 0.3 },
+  { "index": 10, "source": "filler", "label": "tall_grass", "placement": "scattered", "density": 0.6 },
+  { "index": 11, "source": "filler", "label": "bamboo", "placement": "roadside", "density": 0.45 },
+  { "index": 12, "source": "filler", "label": "wooden_fence", "placement": "roadside", "density": 0.35 },
+  { "index": 13, "source": "filler", "label": "torch", "placement": "roadside", "density": 0.3 },
+  { "index": 14, "source": "filler", "label": "wooden_crate", "placement": "scattered", "density": 0.25 }
+]
+----------------------------------------------------------------------------------------------------
+
+--- 5. ClaudeAssetMergeService.merge() -> final composition ---
+{
+  "final_objects": [
+    {
+      "index": 0,
+      "source": "photo",
+      "label": "broadleaf_tree",
+      "original_placement": "landmark",
+      "final_placement": "landmark",
+      "density": 0.6
+    },
+    {
+      "index": 1,
+      "source": "photo",
+      "label": "grass_tuft",
+      "original_placement": "scattered",
+      "final_placement": "scattered",
+      "density": 0.5
+    },
+    {
+      "index": 2,
+      "source": "photo",
+      "label": "yellow_flower_bush",
+      "original_placement": "scattered",
+      "final_placement": "scattered",
+      "density": 0.4
+    },
+    {
+      "index": 3,
+      "source": "filler",
+      "label": "palm_tree",
+      "original_placement": "background",
+      "final_placement": "background",
+      "density": 0.15
+    },
+    {
+      "index": 4,
+      "source": "filler",
+      "label": "fern",
+      "original_placement": "scattered",
+      "final_placement": "scattered",
+      "density": 0.6
+    },
+    {
+      "index": 5,
+      "source": "filler",
+      "label": "bush",
+      "original_placement": "scattered",
+      "final_placement": "scattered",
+      "density": 0.55
+    },
+    {
+      "index": 6,
+      "source": "filler",
+      "label": "rock",
+      "original_placement": "scattered",
+      "final_placement": "scattered",
+      "density": 0.4
+    },
+    {
+      "index": 10,
+      "source": "filler",
+      "label": "tall_grass",
+      "original_placement": "scattered",
+      "final_placement": "scattered",
+      "density": 0.6
+    },
+    {
+      "index": 11,
+      "source": "filler",
+      "label": "bamboo",
+      "original_placement": "roadside",
+      "final_placement": "roadside",
+      "density": 0.45
+    },
+    {
+      "index": 12,
+      "source": "filler",
+      "label": "wooden_fence",
+      "original_placement": "roadside",
+      "final_placement": "roadside",
+      "density": 0.35
+    }
+  ],
+  "dropped_candidate_indices": [7, 8, 9, 13, 14],
+  "composition_counts": {
+    "background": 1,
+    "landmark": 1,
+    "roadside": 2,
+    "scattered": 6
+  }
+}
+
+Result: exactly 1 background (palm_tree, the only background candidate --
+kept as-is), exactly 1 landmark (the photo-grounded broadleaf_tree -- the
+correct choice per the prompt's "prefer photo/text over filler" rule, since
+no filler candidate is even eligible for "landmark" when personalize=true),
+and 10 of 15 candidates kept overall: the merge dropped 5 near-duplicate/
+low-value filler candidates (vine, tree_stump, log, torch, wooden_crate) as
+redundant against the other jungle-floor vegetation and roadside props it
+kept instead (fern, bush, rock, tall_grass, bamboo, wooden_fence) -- real
+curation, not just relabeling.
+----------------------------------------------------------------------------------------------------

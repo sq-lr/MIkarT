@@ -4,6 +4,11 @@
     MESH_PROVIDER          mock (default) | meshy        -> MeshGenerationService
     TEXT_ASSET_PROVIDER    mock (default) | claude       -> TextAssetService
     FILLER_ASSET_PROVIDER  mock (default) | claude       -> FillerAssetService
+    ASSET_MERGE_PROVIDER   mock (default) | claude       -> AssetMergeService, used only when
+                                                             personalize=True to pick the final
+                                                             background/landmark/roadside/scattered
+                                                             composition across the photo/text/filler
+                                                             candidates
     LIBRARY_PROVIDER       mock (default) | polypizza    -> LibraryAssetService
     MATCH_PICKER_PROVIDER  claude (default) | heuristic  -> MatchPickerService, used only by
                                                              LIBRARY_PROVIDER=polypizza to pick
@@ -20,6 +25,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from app.services.asset_merge_service import AssetMergeService, ClaudeAssetMergeService, MockAssetMergeService
 from app.services.filler_asset_service import ClaudeFillerAssetService, FillerAssetService, MockFillerAssetService
 from app.services.library_asset_service import LibraryAssetService, MockLibraryAssetService, PolyPizzaLibraryAssetService
 from app.services.match_picker_service import ClaudeMatchPickerService, HeuristicMatchPickerService, MatchPickerService
@@ -55,6 +61,7 @@ class Providers:
     synthesis: WorldSynthesisService
     text_assets: TextAssetService
     filler_assets: FillerAssetService
+    asset_merge: AssetMergeService
     library: LibraryAssetService
     registry: MeshTaskRegistry
     max_objects_per_world: int
@@ -126,6 +133,16 @@ def build_from_env() -> Providers:
     else:
         raise RuntimeError(f"unknown FILLER_ASSET_PROVIDER {filler_asset_provider!r} (expected 'mock' or 'claude')")
 
+    asset_merge_provider = os.environ.get("ASSET_MERGE_PROVIDER", "mock").strip().lower()
+    if asset_merge_provider == "mock":
+        asset_merge: AssetMergeService = MockAssetMergeService()
+    elif asset_merge_provider == "claude":
+        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+            raise RuntimeError("ASSET_MERGE_PROVIDER=claude requires ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN)")
+        asset_merge = ClaudeAssetMergeService()
+    else:
+        raise RuntimeError(f"unknown ASSET_MERGE_PROVIDER {asset_merge_provider!r} (expected 'mock' or 'claude')")
+
     library_provider = os.environ.get("LIBRARY_PROVIDER", "mock").strip().lower()
     if library_provider == "mock":
         library: LibraryAssetService = MockLibraryAssetService()
@@ -154,6 +171,7 @@ def build_from_env() -> Providers:
         synthesis=MockWorldSynthesisService(),
         text_assets=text_assets,
         filler_assets=filler_assets,
+        asset_merge=asset_merge,
         library=library,
         registry=MeshTaskRegistry(),
         max_objects_per_world=max_objects,
