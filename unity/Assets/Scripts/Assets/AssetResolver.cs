@@ -24,12 +24,12 @@ namespace MarioKart.AssetsSystem
         // to the keyword heuristic below.
         private static readonly Dictionary<string, AssetDefinition> KnownTypes = new()
         {
-            ["palm_tree"] = new AssetDefinition { objectType = "palm_tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.42f, 0.58f, 0.36f), defaultScale = new Vector3(0.5f, 2f, 0.5f) },
-            ["tree"] = new AssetDefinition { objectType = "tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.38f, 0.52f, 0.32f), defaultScale = new Vector3(0.7f, 3.2f, 0.7f) },
-            ["pine_tree"] = new AssetDefinition { objectType = "pine_tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.32f, 0.46f, 0.34f), defaultScale = new Vector3(0.5f, 3.4f, 0.5f) },
-            ["rock"] = new AssetDefinition { objectType = "rock", fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.62f, 0.58f, 0.48f), defaultScale = new Vector3(1f, 0.7f, 1f) },
-            ["cactus"] = new AssetDefinition { objectType = "cactus", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.42f, 0.58f, 0.36f), defaultScale = new Vector3(0.4f, 1.5f, 0.4f) },
-            ["bush"] = new AssetDefinition { objectType = "bush", fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.46f, 0.62f, 0.36f), defaultScale = new Vector3(1.1f, 0.85f, 1.1f) },
+            ["palm_tree"] = new AssetDefinition { objectType = "palm_tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.18f, 0.55f, 0.34f), defaultScale = new Vector3(0.5f, 2f, 0.5f) },
+            ["tree"] = new AssetDefinition { objectType = "tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.30f, 0.42f, 0.24f), defaultScale = new Vector3(0.6f, 2.5f, 0.6f) },
+            ["pine_tree"] = new AssetDefinition { objectType = "pine_tree", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.20f, 0.35f, 0.25f), defaultScale = new Vector3(0.5f, 3f, 0.5f) },
+            ["rock"] = new AssetDefinition { objectType = "rock", fallbackPrimitive = PrimitiveType.Sphere, tintColor = Color.gray, defaultScale = new Vector3(1f, 0.7f, 1f) },
+            ["cactus"] = new AssetDefinition { objectType = "cactus", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.25f, 0.5f, 0.25f), defaultScale = new Vector3(0.4f, 1.5f, 0.4f) },
+            ["bush"] = new AssetDefinition { objectType = "bush", fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.25f, 0.45f, 0.2f), defaultScale = new Vector3(0.8f, 0.6f, 0.8f) },
         };
 
         public AssetDefinition Resolve(WorldObjectEntry entry)
@@ -60,14 +60,14 @@ namespace MarioKart.AssetsSystem
 
             if (label.Contains("tree") || label.Contains("pole") || label.Contains("post") || label.Contains("lamp") || label.Contains("column"))
             {
-                return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.55f, 0.48f, 0.38f), defaultScale = new Vector3(0.4f, 2f, 0.4f) };
+                return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.45f, 0.4f, 0.35f), defaultScale = new Vector3(0.4f, 2f, 0.4f) };
             }
             if (label.Contains("rock") || label.Contains("boulder") || label.Contains("stone") || label.Contains("bush") || label.Contains("shrub"))
             {
-                return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.62f, 0.58f, 0.48f), defaultScale = new Vector3(1f, 0.7f, 1f) };
+                return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Sphere, tintColor = Color.gray, defaultScale = new Vector3(1f, 0.7f, 1f) };
             }
 
-            return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cube, tintColor = new Color(0.72f, 0.68f, 0.58f), defaultScale = Vector3.one };
+            return new AssetDefinition { objectType = objectType, fallbackPrimitive = PrimitiveType.Cube, tintColor = new Color(0.6f, 0.6f, 0.6f), defaultScale = Vector3.one };
         }
 
         private static AssetDefinition Clone(AssetDefinition source)

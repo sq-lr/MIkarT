@@ -17,11 +17,11 @@ namespace MarioKart.Players
         public float minImpactSpeed = 2f;
         [Tooltip("How long grip stays reduced after an impact.")]
         public float skidDuration = 0.5f;
-        public Color smokeColor = new Color(0.86f, 0.84f, 0.78f, 0.28f);
+        public Color smokeColor = new Color(0.8f, 0.8f, 0.8f, 0.3f);
         [Tooltip("Tyre smoke puffs per second per rear wheel while skidding.")]
         public float smokeRatePerWheel = 8f;
-        public Color sparkColor = new Color(1f, 0.85f, 0.55f);
-        public Color skidMarkColor = new Color(0.28f, 0.22f, 0.16f, 0.55f);
+        public Color sparkColor = new Color(1f, 0.85f, 0.4f);
+        public Color skidMarkColor = new Color(0.05f, 0.05f, 0.05f, 0.85f);
 
         // Rear wheel positions in the kart cube's local space.
         private static readonly Vector3[] RearWheelLocalPositions =

@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using MarioKart.AI;
 using MarioKart.AssetsSystem;
 using MarioKart.Core;
-using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.World
@@ -109,11 +108,10 @@ namespace MarioKart.World
             var definitions = new List<AssetDefinition>();
             var placeholdersByType = new Dictionary<string, List<GameObject>>();
 
-            Color skyColor = GhibliLook.Cream;
+            Color skyColor = new Color(0.6f, 0.75f, 0.9f);
             if (recipe.palette != null && recipe.palette.Count > 2)
             {
                 ColorUtility.TryParseHtmlString(recipe.palette[2], out skyColor);
-                skyColor = Color.Lerp(skyColor, GhibliLook.Cream, 0.45f);
             }
 
             int typeCount = recipe.objects.Count;
@@ -345,12 +343,7 @@ namespace MarioKart.World
                 var renderer = go.GetComponent<Renderer>();
                 if (renderer != null && definition.prefab == null)
                 {
-                    Color haze = Color.Lerp(renderer.sharedMaterial.color, skyColor, 0.6f);
-                    renderer.sharedMaterial = GhibliLook.Lit(haze);
-                    if (renderer.sharedMaterial.HasProperty("_Fill"))
-                    {
-                        renderer.sharedMaterial.SetFloat("_Fill", 0.28f);
-                    }
+                    renderer.material.color = Color.Lerp(renderer.material.color, skyColor, 0.6f);
                 }
             }
         }
@@ -404,10 +397,9 @@ namespace MarioKart.World
 
             if (definition.prefab == null && renderer != null)
             {
-                Color tint = role == Role.Landmark
+                renderer.material.color = role == Role.Landmark
                     ? definition.tintColor
                     : JitterColor(definition.tintColor, hue, sat, val);
-                renderer.sharedMaterial = GhibliLook.Lit(tint);
             }
 
             // Decoration only: karts are kept on the road by the barriers.

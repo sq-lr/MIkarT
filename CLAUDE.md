@@ -62,12 +62,10 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   fails). By default the Generating screen waits for the meshes, with a
   timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
   turn it off to race immediately while they stream in
-✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
-  reshuffled on the racing line each world generation
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
-✗ Items, weapons, hazards, powerups (beyond the pass-through track obstacles)
+✗ Obstacles, items, weapons, hazards, powerups, boosts
 ✗ Multiple track templates, branching tracks, jumps
 ✗ Complex procedural terrain
 ✗ Asset retrieval / asset-pack lookup (replaced by mesh generation)

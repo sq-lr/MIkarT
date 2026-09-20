@@ -50,17 +50,8 @@ namespace MarioKart.Players
         private PhysicsMaterial frictionless;
         private float scrapingUntil; // Time.time until which the scrape cap applies
         private float skidUntil;     // Time.time until which grip is reduced
-        private float boostUntil;
-        private float boostMultiplier = 1f;
-        private float paralyzeUntil;
-        private float spinRemainingDeg;
-        private float spinRateDeg;
-        private float spinSign = 1f;
 
         public bool IsSkidding => Time.time < skidUntil;
-        public bool IsBoosting => Time.time < boostUntil;
-        public bool IsParalyzed => Time.time < paralyzeUntil;
-        public bool IsSpinning => spinRemainingDeg > 0f;
 
         public float ForwardSpeed { get; private set; }
 
@@ -81,11 +72,6 @@ namespace MarioKart.Players
             {
                 col.material = frictionless;
             }
-
-            if (GetComponent<KartVisual>() == null)
-            {
-                gameObject.AddComponent<KartVisual>();
-            }
         }
 
         private void OnDestroy()
@@ -105,49 +91,6 @@ namespace MarioKart.Players
         public void StartSkid(float seconds)
         {
             skidUntil = Mathf.Max(skidUntil, Time.time + seconds);
-        }
-
-        /// <summary>
-        /// Raise top speed for a while and kick current velocity toward the
-        /// new cap. Called by TrackObstacle (boost pickup).
-        /// </summary>
-        public void ApplyBoost(float seconds, float multiplier)
-        {
-            if (rb == null || rb.isKinematic) return;
-            boostUntil = Mathf.Max(boostUntil, Time.time + seconds);
-            boostMultiplier = Mathf.Max(boostMultiplier, multiplier);
-
-            Vector3 velocity = rb.linearVelocity;
-            float forwardSpeed = Vector3.Dot(velocity, transform.forward);
-            float target = maxSpeed * boostMultiplier;
-            if (forwardSpeed < target)
-            {
-                float add = Mathf.Min(target - forwardSpeed, maxSpeed * 0.45f);
-                rb.linearVelocity = velocity + transform.forward * add;
-            }
-        }
-
-        /// <summary>Freeze horizontal motion and ignore input. Called by TrackObstacle.</summary>
-        public void ApplyParalyze(float seconds)
-        {
-            if (rb == null || rb.isKinematic) return;
-            paralyzeUntil = Time.time + seconds;
-            rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
-            rb.angularVelocity = Vector3.zero;
-            spinRemainingDeg = 0f;
-        }
-
-        /// <summary>
-        /// Yaw the kart through <paramref name="turns"/> full rotations
-        /// (sign = direction) while ignoring steering. Called by TrackObstacle.
-        /// </summary>
-        public void ApplySpin(float turns)
-        {
-            if (rb == null || rb.isKinematic) return;
-            spinSign = turns < 0f ? -1f : 1f;
-            spinRemainingDeg = Mathf.Abs(turns) * 360f;
-            float duration = Mathf.Lerp(0.35f, 0.85f, Mathf.InverseLerp(0.25f, 1.25f, Mathf.Abs(turns)));
-            spinRateDeg = spinRemainingDeg / Mathf.Max(0.2f, duration);
         }
 
         /// <summary>Called by TrackBarrier on first contact with a wall.</summary>
@@ -176,29 +119,6 @@ namespace MarioKart.Players
             }
 
             float dt = Time.fixedDeltaTime;
-
-            if (IsParalyzed)
-            {
-                rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
-                rb.angularVelocity = Vector3.zero;
-                ForwardSpeed = 0f;
-                return;
-            }
-
-            if (!IsBoosting) boostMultiplier = 1f;
-
-            KartInput input = currentInput;
-            if (IsSpinning)
-            {
-                float step = Mathf.Min(spinRemainingDeg, spinRateDeg * dt);
-                spinRemainingDeg -= step;
-                rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, spinSign * step, 0f));
-                // Keep world-space velocity so the kart pirouettes instead of
-                // steering into a circle. Grip re-aligns after the spin ends.
-                ForwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
-                return;
-            }
-
             Vector3 velocity = rb.linearVelocity;
             Vector3 forward = transform.forward;
             Vector3 right = transform.right;
@@ -207,16 +127,15 @@ namespace MarioKart.Players
             float lateralSpeed = Vector3.Dot(velocity, right);
 
             // ---- Longitudinal ----
-            float boostedMax = maxSpeed * boostMultiplier;
-            float topSpeed = Time.time < scrapingUntil ? boostedMax * barrierScrapeSpeedFactor : boostedMax;
-            if (input.throttle > 0f)
+            float topSpeed = Time.time < scrapingUntil ? maxSpeed * barrierScrapeSpeedFactor : maxSpeed;
+            if (currentInput.throttle > 0f)
             {
-                forwardSpeed = Mathf.MoveTowards(forwardSpeed, topSpeed * input.throttle, acceleration * dt);
+                forwardSpeed = Mathf.MoveTowards(forwardSpeed, topSpeed * currentInput.throttle, acceleration * dt);
             }
-            else if (input.brake > 0f)
+            else if (currentInput.brake > 0f)
             {
                 // Brake to a stop, then reverse.
-                float target = forwardSpeed > 0.05f ? 0f : -maxReverseSpeed * input.brake;
+                float target = forwardSpeed > 0.05f ? 0f : -maxReverseSpeed * currentInput.brake;
                 forwardSpeed = Mathf.MoveTowards(forwardSpeed, target, brakeForce * dt);
             }
             else
@@ -233,8 +152,8 @@ namespace MarioKart.Players
             rb.angularVelocity = spin;
 
             // ---- Steering: yaw rate scales with speed, flips in reverse ----
-            float speedFactor = Mathf.Clamp(forwardSpeed / boostedMax, -1f, 1f);
-            float yaw = input.steering * steerSpeed * speedFactor * dt;
+            float speedFactor = Mathf.Clamp(forwardSpeed / maxSpeed, -1f, 1f);
+            float yaw = currentInput.steering * steerSpeed * speedFactor * dt;
             if (Mathf.Abs(yaw) > 0f)
             {
                 rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, yaw, 0f));

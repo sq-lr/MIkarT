@@ -16,7 +16,6 @@ namespace MarioKart.Racing
 
         private int nextExpectedCheckpoint;
         public int CurrentLap { get; private set; }
-        public int TotalLaps => totalLaps;
         public bool Finished { get; private set; }
 
         public event Action<int> OnLapCompleted;
