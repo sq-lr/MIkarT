@@ -10,18 +10,35 @@ namespace MarioKart.UI
     /// <summary>
     /// Full-width translucent chess-checkered stripe on each player's
     /// split-screen half. Winner gets WIN + confetti; loser gets DEFEAT
-    /// and loss pop-ups. Karts keep driving.
+    /// and loss pop-ups. Karts keep driving. Sound: a fanfare and a big
+    /// crowd cheer land with the stripe when the first kart finishes, and the
+    /// runner-up gets the plain lap chime when they finally cross the line
+    /// (KartAudio deliberately stays quiet on the final lap for this).
+    /// Clips play through UISounds, so a missing one warns once and is
+    /// skipped.
     /// </summary>
     public class ResultsUI : MonoBehaviour
     {
         [SerializeField] private GameObject panel;
         [SerializeField] private Button playAgainButton;
 
+        [Header("Finish sound")]
+        [Range(0f, 1f)] public float fanfareVolume = 0.8f;
+        [Tooltip("The cheer is the loudest thing in the mix: the clip itself is boosted by fetch_sfx.py, and it plays flat out.")]
+        [Range(0f, 1f)] public float cheerVolume = 1f;
+        [Tooltip("Volume of the lap chime played when the second kart finishes.")]
+        [Range(0f, 1f)] public float finishVolume = 0.7f;
+
+        private const string FanfarePath = "Audio/race_fanfare";
+        private const string CheerPath = "Audio/race_cheer";
+        private const string FinishPath = "Audio/lap_complete";
+
         private HalfView p1;
         private HalfView p2;
         private Button playAgainCopy;
         private bool built;
         private int shownWinner;
+        private int announcedFinishers; // how many placements have had their sound
         private Coroutine showRoutine;
         private readonly List<Confetti> bits = new List<Confetti>();
 
@@ -42,9 +59,6 @@ namespace MarioKart.UI
             public float life;
         }
 
-        private static readonly Color Gold = new Color(1f, 0.84f, 0.12f);
-        private static readonly Color P1Red = new Color(0.95f, 0.22f, 0.22f);
-        private static readonly Color P2Blue = new Color(0.22f, 0.48f, 0.98f);
         private static readonly Color DefeatInk = new Color(0.72f, 0.74f, 0.80f);
         private static readonly Color[] WinColors =
         {
@@ -94,16 +108,29 @@ namespace MarioKart.UI
             {
                 panel.SetActive(false);
                 shownWinner = 0;
+                announcedFinishers = 0;
             }
         }
 
+        /// <summary>
+        /// RaceManager fires this once per finisher, with the placements so
+        /// far. The banner is for the first; later calls only add a sound.
+        /// </summary>
         public void DisplayResult(RaceResult result)
         {
             Build();
             if (result == null || result.placements == null || result.placements.Count == 0) return;
 
+            bool newFinisher = result.placements.Count > announcedFinishers;
+            announcedFinishers = Mathf.Max(announcedFinishers, result.placements.Count);
+
             var winner = result.placements[0];
-            if (shownWinner == winner.playerIndex) return;
+            if (shownWinner == winner.playerIndex)
+            {
+                // Runner-up crossing the line under an already-shown banner.
+                if (newFinisher) UISounds.Play(FinishPath, finishVolume);
+                return;
+            }
 
             shownWinner = winner.playerIndex;
             panel.SetActive(true);
@@ -117,11 +144,11 @@ namespace MarioKart.UI
             int loserIndex = winnerIndex == 1 ? 2 : 1;
             var winHalf = HalfFor(winnerIndex);
             var loseHalf = HalfFor(loserIndex);
-            Color winColor = winnerIndex == 1 ? P1Red : P2Blue;
-            Color loseColor = loserIndex == 1 ? P1Red : P2Blue;
+            Color winColor = winnerIndex == 1 ? PlayerColors.P1 : PlayerColors.P2;
+            Color loseColor = loserIndex == 1 ? PlayerColors.P1 : PlayerColors.P2;
 
             winHalf.headline.text = "WIN";
-            winHalf.headline.color = Gold;
+            winHalf.headline.color = PlayerColors.Gold;
             loseHalf.headline.text = "DEFEAT";
             loseHalf.headline.color = DefeatInk;
 
@@ -137,6 +164,11 @@ namespace MarioKart.UI
                 yield return null;
             }
             winHalf.strip.localScale = loseHalf.strip.localScale = Vector3.one;
+
+            // With the stripe, not the line-crossing itself, so it lands on
+            // the pop-ups and confetti.
+            UISounds.Play(FanfarePath, fanfareVolume);
+            UISounds.Play(CheerPath, cheerVolume);
 
             SpawnWinPopups(winHalf, winColor);
             SpawnDefeatPopups(loseHalf, loseColor);
@@ -161,12 +193,12 @@ namespace MarioKart.UI
         private void SpawnWinPopups(HalfView half, Color playerColor)
         {
             ClearChildren(half.popRoot);
-            StartCoroutine(PopupStamp(half, "WIN", new Vector2(-280f, 62f), 48, Gold, 0.05f));
+            StartCoroutine(PopupStamp(half, "WIN", new Vector2(-280f, 62f), 48, PlayerColors.Gold, 0.05f));
             StartCoroutine(PopupStamp(half, "WIN", new Vector2(300f, -58f), 44, playerColor, 0.12f));
             StartCoroutine(PopupStamp(half, "1st", new Vector2(-320f, -48f), 38, Color.white, 0.18f));
-            StartCoroutine(PopupStamp(half, "★", new Vector2(310f, 70f), 52, Gold, 0.08f));
+            StartCoroutine(PopupStamp(half, "★", new Vector2(310f, 70f), 52, PlayerColors.Gold, 0.08f));
             StartCoroutine(PopupStamp(half, "★", new Vector2(-70f, 82f), 40, playerColor, 0.22f));
-            StartCoroutine(PopupStamp(half, "★", new Vector2(80f, -80f), 36, Gold, 0.28f));
+            StartCoroutine(PopupStamp(half, "★", new Vector2(80f, -80f), 36, PlayerColors.Gold, 0.28f));
         }
 
         private void SpawnDefeatPopups(HalfView half, Color playerColor)
@@ -289,7 +321,7 @@ namespace MarioKart.UI
 
             BuildChessBoard(strip, 24, 4);
 
-            var headline = CreateLabel("Headline", strip, "WIN", 110, Gold);
+            var headline = CreateLabel("Headline", strip, "WIN", 110, PlayerColors.Gold);
             Stretch(headline.rectTransform);
             headline.rectTransform.offsetMin = new Vector2(0f, 6f);
             headline.rectTransform.offsetMax = new Vector2(0f, -6f);

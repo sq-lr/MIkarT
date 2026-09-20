@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.World
@@ -108,36 +107,7 @@ namespace MarioKart.World
 
         private static void BuildVisual(Transform root, ObstacleKind kind)
         {
-            Color color = TrackObstacle.KindColor(kind);
-            GameObject visual;
-            switch (kind)
-            {
-                case ObstacleKind.Boost:
-                    visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                    visual.transform.localScale = new Vector3(0.55f, 0.55f, 0.55f) * PickupScale;
-                    visual.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
-                    break;
-                case ObstacleKind.Paralyze:
-                    visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    visual.transform.localScale = Vector3.one * (PickupScale * 0.75f);
-                    break;
-                default:
-                    visual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    visual.transform.localScale = new Vector3(PickupScale, PickupScale * 0.22f, PickupScale);
-                    break;
-            }
-
-            visual.name = "Visual";
-            visual.transform.SetParent(root, worldPositionStays: false);
-            visual.transform.localPosition = Vector3.zero;
-            var visualCollider = visual.GetComponent<Collider>();
-            if (visualCollider != null) Destroy(visualCollider);
-
-            var renderer = visual.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.sharedMaterial = GhibliLook.Lit(color);
-            }
+            ObstacleVisuals.Build(root, kind, PickupScale);
         }
 
         private Pose RandomPose(float minDistanceFromExisting = 0f)

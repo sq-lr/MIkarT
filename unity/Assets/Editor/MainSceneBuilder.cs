@@ -276,6 +276,7 @@ namespace MarioKart.EditorTools
             kart.AddComponent<KartVisual>();      // builds the wheels/body/driver meshes at runtime
             kart.AddComponent<KartSpeedEffect>(); // builds its own particle systems at runtime
             kart.AddComponent<KartSkidEffect>();  // likewise: smoke, sparks, skid marks
+            kart.AddComponent<KartPickupEffect>(); // likewise: boost / stop / spin pickup bursts
             var audio = kart.AddComponent<KartAudio>(); // engine loops + one-shots from Resources/Audio
             audio.pitchOffset = playerIndex == 2 ? 0.04f : -0.04f; // the two engines shouldn't phase
 

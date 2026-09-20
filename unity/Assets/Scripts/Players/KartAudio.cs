@@ -1,3 +1,4 @@
+using MarioKart.Racing;
 using UnityEngine;
 
 namespace MarioKart.Players
@@ -5,7 +6,7 @@ namespace MarioKart.Players
     /// <summary>
     /// Comic sound effects for one kart, from the CC0 clips in
     /// Resources/Audio (see CREDITS.txt there; tools/sfx/fetch_sfx.py
-    /// rebuilds them). Four parts:
+    /// rebuilds them). Five parts:
     ///   • one engine loop (a cartoon putt-putt) driven by the keys, not
     ///     by speed: holding the accelerator revs it up -- faster, higher,
     ///     louder; letting go, or pressing against the direction of
@@ -14,7 +15,11 @@ namespace MarioKart.Players
     ///   • a toon clang on impact, louder the harder the hit
     ///     (via KartController.Impact, like the camera shake),
     ///   • a jingle / power-down sting on pickups (KartController.PowerUp /
-    ///     PowerDown).
+    ///     PowerDown),
+    ///   • a chime on every completed lap (LapManager.OnLapCompleted),
+    ///     pitched a little higher each lap. Not on the last one: crossing
+    ///     the finish line is announced by ResultsUI (fanfare + cheer for
+    ///     the winner, one plain chime for the runner-up).
     /// Everything is 2D: the scene has a single AudioListener (Camera_P1),
     /// so both karts must be heard equally. A missing clip logs one warning
     /// and that sound is simply skipped -- the race never depends on audio.
@@ -52,12 +57,17 @@ namespace MarioKart.Players
         public float minImpactSpeed = 2f;
         [Tooltip("Shortest gap between two hit sounds, so scraping a wall doesn't machine-gun.")]
         public float hitCooldown = 0.15f;
+        [Range(0f, 1f)] public float lapVolume = 0.7f;
+        [Tooltip("Lap chime pitch on the first and the penultimate lap; it climbs between them.")]
+        public float firstLapPitch = 1f;
+        public float lastLapPitch = 1.15f;
 
         private KartController kart;
+        private LapManager laps; // optional: on the same kart when built by MainSceneBuilder
         private Rigidbody rb;
         private AudioSource engineSource, oneShotSource;
         private AudioClip[] screechClips, hitClips;
-        private AudioClip powerUpClip, powerDownClip;
+        private AudioClip powerUpClip, powerDownClip, lapClip;
         private bool wasSkidding;
         private float lastHitTime = -10f;
         private float rev; // 0 = idle, 1 = flat out; follows the keys, not the speed
@@ -65,6 +75,7 @@ namespace MarioKart.Players
         private void Awake()
         {
             kart = GetComponent<KartController>();
+            laps = GetComponent<LapManager>();
             rb = GetComponent<Rigidbody>();
 
             engineSource = CreateLoop("Audio_Engine", LoadClip("kart_engine"));
@@ -74,6 +85,7 @@ namespace MarioKart.Players
             hitClips = LoadVariants("kart_hit");
             powerUpClip = LoadClip("pickup_powerup");
             powerDownClip = LoadClip("pickup_powerdown");
+            lapClip = LoadClip("lap_complete");
         }
 
         private void OnEnable()
@@ -81,6 +93,7 @@ namespace MarioKart.Players
             kart.Impact += OnImpact;
             kart.PowerUp += OnPowerUp;
             kart.PowerDown += OnPowerDown;
+            if (laps != null) laps.OnLapCompleted += OnLapCompleted;
         }
 
         private void OnDisable()
@@ -88,6 +101,7 @@ namespace MarioKart.Players
             kart.Impact -= OnImpact;
             kart.PowerUp -= OnPowerUp;
             kart.PowerDown -= OnPowerDown;
+            if (laps != null) laps.OnLapCompleted -= OnLapCompleted;
         }
 
         private void Update()
@@ -153,6 +167,15 @@ namespace MarioKart.Players
         private void OnPowerDown()
         {
             PlayOneShot(powerDownClip, pickupVolume, 1f);
+        }
+
+        private void OnLapCompleted(int lap)
+        {
+            // The final lap is the finish: ResultsUI owns that moment.
+            if (laps.TotalLaps > 0 && lap >= laps.TotalLaps) return;
+            // Lap 1 is firstLapPitch, the penultimate lap is lastLapPitch.
+            float t = Mathf.InverseLerp(1f, Mathf.Max(2, laps.TotalLaps - 1), lap);
+            PlayOneShot(lapClip, lapVolume, Mathf.Lerp(firstLapPitch, lastLapPitch, t));
         }
 
         // ------------------------------------------------------------------

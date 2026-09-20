@@ -1,5 +1,6 @@
 Sound effects used by Assets/Scripts/Players/KartAudio.cs,
-Assets/Scripts/UI/UISounds.cs and UI/GenerationUI.cs, and the music
+Assets/Scripts/UI/UISounds.cs, UI/GenerationUI.cs and UI/ResultsUI.cs,
+and the music
 loops used by Assets/Scripts/Audio/MusicPlayer.cs, fetched (and, for
 the effects, trimmed) by tools/sfx/fetch_sfx.py.
 
@@ -29,6 +30,15 @@ Kart sounds, from Freesound:
 - countdown_go.wav (2.30s)
     "airhorn-short.wav" by guitarguy1985 -- https://freesound.org/s/68999/
     quick air horn with its echo, for GO!
+- lap_complete.wav (1.66s)
+    "new_fastest_lap.wav" by RichieMcMullen -- https://freesound.org/s/386811/
+    short rhythmic chime for a completed lap; KartAudio pitches it up lap by lap, ResultsUI reuses it when the runner-up crosses the line
+- race_fanfare.wav (2.15s)
+    "Game Success Fanfare Short" by el_boss -- https://freesound.org/s/677858/
+    victory jingle for the WIN banner; the first 0.55 s of the source is silence
+- race_cheer.wav (4.80s)
+    "Cheer 1 short.wav" by jayfrosting -- https://freesound.org/s/333405/
+    crowd cheer with the finish confetti; boosted and soft-clipped so it sits on top of the music and the fanfare
 
 UI sounds, from Kenney's asset packs (https://kenney.nl):
 

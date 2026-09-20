@@ -10,8 +10,8 @@ the standard library; music is kept as the downloaded MP3 (Unity imports it
 natively, and a two-minute loop as WAV would be ~10 MB in the repo -- the
 MP3 encoder padding can give a tiny hiccup at the loop seam). Output goes
 to unity/Assets/Resources/Audio/ (music under Audio/Music/) along with a
-CREDITS.txt; KartAudio.cs, UISounds.cs, GenerationUI.cs and MusicPlayer.cs
-load the clips by the names below.
+CREDITS.txt; KartAudio.cs, UISounds.cs, GenerationUI.cs, ResultsUI.cs and
+MusicPlayer.cs load the clips by the names below.
 
     python3 tools/sfx/fetch_sfx.py
 
@@ -58,6 +58,9 @@ class Clip:
     max_variants: int = 8
     silence_threshold: float = 0.02  # RMS (0..1) below which a window counts as a gap
     loop: bool = False   # crossfade the seam so it loops without a click
+    # Extra gain (dB) applied after peak-normalising, with a soft clip so the
+    # peaks fold over instead of wrapping: squashes a peaky clip louder.
+    boost_db: float = 0.0
     notes: str = ""
     extra: dict = field(default_factory=dict)
 
@@ -146,6 +149,36 @@ CLIPS: list[Clip] = [
         preview_url="https://cdn.freesound.org/previews/68/68999_533680-hq.mp3",
         trim=(0.3, 2.6),
         notes="quick air horn with its echo, for GO!",
+    ),
+    Clip(
+        name="lap_complete",
+        freesound_id=386811,
+        title="new_fastest_lap.wav",
+        author="RichieMcMullen",
+        preview_url="https://cdn.freesound.org/previews/386/386811_7236624-hq.mp3",
+        trim=(0.0, 1.66),
+        notes="short rhythmic chime for a completed lap; KartAudio pitches it up lap by lap, "
+              "ResultsUI reuses it when the runner-up crosses the line",
+    ),
+    Clip(
+        name="race_fanfare",
+        freesound_id=677858,
+        title="Game Success Fanfare Short",
+        author="el_boss",
+        preview_url="https://cdn.freesound.org/previews/677/677858_9129912-hq.mp3",
+        trim=(0.55, 2.7),
+        notes="victory jingle for the WIN banner; the first 0.55 s of the source is silence",
+    ),
+    Clip(
+        name="race_cheer",
+        freesound_id=333405,
+        title="Cheer 1 short.wav",
+        author="jayfrosting",
+        preview_url="https://cdn.freesound.org/previews/333/333405_5884138-hq.mp3",
+        trim=(0.0, 4.8),
+        boost_db=8.0,
+        notes="crowd cheer with the finish confetti; boosted and soft-clipped so it sits "
+              "on top of the music and the fanfare",
     ),
 ]
 
@@ -343,6 +376,14 @@ def normalise(samples: array.array, peak_dbfs: float = PEAK_DBFS) -> array.array
     return array.array("h", (int(max(-32768, min(32767, x * gain))) for x in samples))
 
 
+def boost(samples: array.array, db: float) -> array.array:
+    """Gain with a tanh soft clip, so a peaky clip gets denser and louder."""
+    if db <= 0:
+        return samples
+    gain = 10 ** (db / 20)
+    return array.array("h", (int(32767 * math.tanh(x * gain / 32767)) for x in samples))
+
+
 def fade(samples: array.array, ms: float = 5.0) -> array.array:
     n = min(len(samples) // 2, int(SAMPLE_RATE * ms / 1000))
     out = array.array("h", samples)
@@ -382,7 +423,7 @@ def process(clip: Clip, work: Path, decoder: str | None) -> list[tuple[str, floa
     else:
         assert clip.trim is not None, clip.name
         part = trim(samples, *clip.trim)
-        part = normalise(part)
+        part = boost(normalise(part), clip.boost_db)
         part = loopify(part) if clip.loop else fade(part)
         outputs = [(clip.name, part)]
 
@@ -418,7 +459,8 @@ def process_music(clip: MusicClip) -> list[tuple[str, float]]:
 def write_credits(results: dict[str, list[tuple[str, float]]]) -> None:
     lines = [
         "Sound effects used by Assets/Scripts/Players/KartAudio.cs,",
-        "Assets/Scripts/UI/UISounds.cs and UI/GenerationUI.cs, and the music",
+        "Assets/Scripts/UI/UISounds.cs, UI/GenerationUI.cs and UI/ResultsUI.cs,",
+        "and the music",
         "loops used by Assets/Scripts/Audio/MusicPlayer.cs, fetched (and, for",
         "the effects, trimmed) by tools/sfx/fetch_sfx.py.",
         "",

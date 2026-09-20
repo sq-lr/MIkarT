@@ -4,7 +4,7 @@ namespace MarioKart.Players
 {
     /// <summary>
     /// Shared helpers for the karts' code-built particle effects (exhaust,
-    /// skid, impact poof). Nothing here is an asset: textures and materials
+    /// skid, impact poof, pickup bursts). Nothing here is an asset: textures and materials
     /// are created at runtime so no prefab or .mat needs hand-authoring
     /// (ADR 0005).
     ///
@@ -38,6 +38,18 @@ namespace MarioKart.Players
             {
                 float ax = Mathf.Abs(x), ay = Mathf.Abs(y);
                 return Mathf.Pow(Mathf.Pow(ax, 0.5f) + Mathf.Pow(ay, 0.5f), 2f);
+            });
+        }
+
+        /// <summary>Chunky "X" mark (cartoon "nope") with a dark outline.</summary>
+        public static Texture2D Cross(int size = 64, float armHalfWidth = 0.3f)
+        {
+            // Distance to the nearer diagonal, scaled so the arm edge is 1,
+            // and cut off at the square's edge so the arms end squarely.
+            return Shape("Cross", size, (x, y) =>
+            {
+                float arm = Mathf.Min(Mathf.Abs(x - y), Mathf.Abs(x + y)) / (1.41421f * armHalfWidth);
+                return Mathf.Max(arm, Mathf.Max(Mathf.Abs(x), Mathf.Abs(y)));
             });
         }
 

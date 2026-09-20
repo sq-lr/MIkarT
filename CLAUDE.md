@@ -53,7 +53,9 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ Two local players, same keyboard
 ✓ Split-screen (top/bottom)
 ✓ Keyboard controls (no controller support yet)
-✓ Basic laps/checkpoints/winner determination
+✓ Basic laps/checkpoints/winner determination, with a per-player HUD (lap
+  counter + toon speed bar, green→red as it fills, gold on boost —
+  `UI/RaceHUD.cs`)
 ✓ Deterministic generation from a seed
 ✓ Offline fallback (DefaultWorldRecipe) if the backend call fails
 ✓ VLM object extraction (Claude vision) + Meshy image-to-3D meshes for the
@@ -81,7 +83,9 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
   turn it off to race immediately while they stream in
 ✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
-  reshuffled on the racing line each world generation
+  reshuffled on the racing line each world generation, drawn as runtime-built
+  signs (green `>>`, a STOP sign, Subway-style opposing arrows —
+  `World/ObstacleVisuals.cs`)
 ✓ Cel-shaded look on everything (placeholders, track, karts, generated
   meshes), with the shadow band and rim light driven by the recipe palette
   (`GameConfig.toonShading`, `Assets/Scripts/Rendering/ToonStyle.cs` — see
@@ -89,9 +93,11 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   (outlined hard-edged shapes, stepped colours, shrink-out) in
   `Players/KartParticles.cs`
 ✓ Comic SFX per kart (putt-putt engine loop revved by the accelerator key, skid "skrrt", hit clang,
-  power-up/down stings) from CC0 Freesound clips in `Resources/Audio/`
-  (`Players/KartAudio.cs`; `tools/sfx/fetch_sfx.py` fetches + trims them,
-  `Resources/Audio/CREDITS.txt` lists sources), plus UI hover/press sounds
+  power-up/down stings, a lap chime that climbs in pitch each lap) from CC0
+  Freesound clips in `Resources/Audio/` (`Players/KartAudio.cs`;
+  `tools/sfx/fetch_sfx.py` fetches + trims them, `Resources/Audio/CREDITS.txt`
+  lists sources), a win fanfare + crowd cheer with the finish stripe and a
+  chime for the runner-up (`UI/ResultsUI.cs`), plus UI hover/press sounds
   on every button and toggle (`UI/UISounds.cs`, Kenney CC0), and a big
   animated comic countdown (popping numerals over a starburst, beeps and an
   air horn on GO! — `UI/GenerationUI.cs`)

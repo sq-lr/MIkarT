@@ -90,16 +90,5 @@ namespace MarioKart.World
                     break;
             }
         }
-
-        public static Color KindColor(ObstacleKind kind)
-        {
-            switch (kind)
-            {
-                case ObstacleKind.Boost: return new Color(0.98f, 0.82f, 0.42f);
-                case ObstacleKind.Paralyze: return new Color(0.78f, 0.42f, 0.38f);
-                case ObstacleKind.Spin: return new Color(0.62f, 0.68f, 0.82f);
-                default: return Color.white;
-            }
-        }
     }
 }

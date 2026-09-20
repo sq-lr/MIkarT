@@ -298,35 +298,58 @@ namespace MarioKart.World
         }
 
         /// <summary>
-        /// Dashed center line + solid edge lines. Separate meshes so they
-        /// sit slightly above the asphalt without fighting its UVs.
+        /// Solid edge lines plus an occasional painted arrow down the middle
+        /// pointing the way round (samples run in the direction of travel).
+        /// Arrows are strips over consecutive samples, like the road itself,
+        /// so they follow the hills instead of cutting through them.
+        /// Separate meshes so they sit slightly above the asphalt without
+        /// fighting its UVs.
         /// </summary>
         private static void BuildLanePaint(Transform root, List<Vector3> centers, Vector3[] rights, float halfWidth)
         {
             const float paintHeight = RoadHeight + 0.03f;
-            const float centerHalf = 0.16f;
             const float edgeHalf = 0.14f;
             const float edgeInset = 0.7f;
-            const int dashOn = 4;
-            const int dashOff = 4;
+            // Samples are ~3-4 m apart, so an arrow is ~15-20 m long and
+            // there is one every ~50-65 m; the first starts half a period
+            // past the start/finish stripe so none sits on top of it.
+            const int arrowPeriod = 16;
+            const int shaftSamples = 3;
+            const int headSamples = 2;
+            const float shaftHalf = 0.35f;
+            const float headHalf = 1.2f;
             var paint = new Color(0.96f, 0.96f, 0.92f);
 
             int n = centers.Count;
-            var dashes = new MeshBuilder();
+            var arrows = new MeshBuilder();
             var edges = new MeshBuilder();
             Vector3 up = Vector3.up * paintHeight;
-            int cycle = dashOn + dashOff;
 
             for (int i = 0; i < n; i++)
             {
                 int j = (i + 1) % n;
-                if ((i % cycle) < dashOn)
+
+                int phase = ((i - arrowPeriod / 2) % arrowPeriod + arrowPeriod) % arrowPeriod;
+                bool fits = i - phase + shaftSamples + headSamples <= n; // don't cut an arrow at the loop seam
+                if (fits && phase < shaftSamples + headSamples)
                 {
-                    Vector3 li = centers[i] - rights[i] * centerHalf + up;
-                    Vector3 ri = centers[i] + rights[i] * centerHalf + up;
-                    Vector3 lj = centers[j] - rights[j] * centerHalf + up;
-                    Vector3 rj = centers[j] + rights[j] * centerHalf + up;
-                    dashes.AddQuad(li, ri, rj, lj, Vector3.up);
+                    float halfI, halfJ;
+                    if (phase < shaftSamples)
+                    {
+                        halfI = halfJ = shaftHalf;
+                    }
+                    else
+                    {
+                        // Head: a strip tapering to a point at the tip.
+                        int k = phase - shaftSamples;
+                        halfI = headHalf * (1f - (float)k / headSamples);
+                        halfJ = headHalf * (1f - (float)(k + 1) / headSamples);
+                    }
+                    Vector3 li = centers[i] - rights[i] * halfI + up;
+                    Vector3 ri = centers[i] + rights[i] * halfI + up;
+                    Vector3 lj = centers[j] - rights[j] * halfJ + up;
+                    Vector3 rj = centers[j] + rights[j] * halfJ + up;
+                    arrows.AddQuad(li, ri, rj, lj, Vector3.up);
                 }
 
                 float inset = halfWidth - edgeInset;
@@ -340,7 +363,7 @@ namespace MarioKart.World
                 }
             }
 
-            CreateMeshObject(root, "CenterLine", dashes, paint, withCollider: false, outline: false).isStatic = true;
+            CreateMeshObject(root, "DirectionArrows", arrows, paint, withCollider: false, outline: false).isStatic = true;
             CreateMeshObject(root, "EdgeLines", edges, paint, withCollider: false, outline: false).isStatic = true;
         }
 

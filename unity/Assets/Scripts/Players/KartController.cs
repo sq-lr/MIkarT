@@ -127,6 +127,10 @@ namespace MarioKart.Players
             {
                 gameObject.AddComponent<KartAudio>();
             }
+            if (GetComponent<KartPickupEffect>() == null)
+            {
+                gameObject.AddComponent<KartPickupEffect>();
+            }
         }
 
         private void OnDestroy()
