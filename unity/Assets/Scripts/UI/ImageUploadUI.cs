@@ -24,6 +24,7 @@ namespace MarioKart.UI
         [SerializeField] private Toggle nightSkyToggle;
         [SerializeField] private ToggleGroup skyToggleGroup;
         [SerializeField] private Transform skyOptionsContainer;
+        [SerializeField] private Toggle personalizeToggle;
         [SerializeField] private Button generateButton;
 
         private IImagePicker picker;
@@ -38,6 +39,7 @@ namespace MarioKart.UI
             picker = new PlaceholderImagePicker();
 #endif
             EnsureSkyOptions();
+            personalizeToggle = EnsurePersonalizeToggle(personalizeToggle);
             chooseImageButton.onClick.AddListener(OnChooseImageClicked);
             generateButton.onClick.AddListener(OnGenerateClicked);
             sunnySkyToggle.group = skyToggleGroup;
@@ -45,8 +47,11 @@ namespace MarioKart.UI
             sunsetSkyToggle.group = skyToggleGroup;
             nightSkyToggle.group = skyToggleGroup;
             sunnySkyToggle.isOn = true;
+            // Off by default: fast/free retrieval-only world unless the
+            // player explicitly opts into slower, personalized generation.
+            personalizeToggle.isOn = false;
             generateButton.interactable = false;
-            foreach (var control in new Selectable[] { chooseImageButton, generateButton, sunnySkyToggle, cloudySkyToggle, sunsetSkyToggle, nightSkyToggle })
+            foreach (var control in new Selectable[] { chooseImageButton, generateButton, sunnySkyToggle, cloudySkyToggle, sunsetSkyToggle, nightSkyToggle, personalizeToggle })
             {
                 UISounds.Attach(control);
             }
@@ -126,6 +131,67 @@ namespace MarioKart.UI
             return createdToggle;
         }
 
+        /// <summary>
+        /// Self-constructs a standalone "Generate personalized assets" toggle
+        /// if one wasn't wired in the Inspector, same fallback pattern as
+        /// EnsureSkyOptions. Off by default -- see WorldGenerationRequest.personalize.
+        /// </summary>
+        private Toggle EnsurePersonalizeToggle(Toggle toggle)
+        {
+            if (toggle != null) return toggle;
+
+            var buttonObject = new GameObject("PersonalizeToggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
+            buttonObject.transform.SetParent((panel != null ? panel : gameObject).transform, false);
+            var rect = buttonObject.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(0f, -410f);
+            rect.sizeDelta = new Vector2(340f, 42f);
+
+            var background = buttonObject.GetComponent<Image>();
+            background.color = new Color(0.16f, 0.16f, 0.16f, 0.95f);
+
+            var createdToggle = buttonObject.GetComponent<Toggle>();
+            createdToggle.targetGraphic = background;
+            createdToggle.colors = new ColorBlock
+            {
+                normalColor = new Color(0.16f, 0.16f, 0.16f),
+                highlightedColor = new Color(0.30f, 0.50f, 0.80f),
+                pressedColor = new Color(0.20f, 0.40f, 0.70f),
+                selectedColor = new Color(0.25f, 0.65f, 0.35f),
+                disabledColor = new Color(0.10f, 0.10f, 0.10f),
+                colorMultiplier = 1f,
+                fadeDuration = 0.1f,
+            };
+
+            var checkObject = new GameObject("Checkmark", typeof(RectTransform), typeof(Image));
+            checkObject.transform.SetParent(buttonObject.transform, false);
+            var checkRect = checkObject.GetComponent<RectTransform>();
+            checkRect.anchorMin = new Vector2(0f, 0.5f);
+            checkRect.anchorMax = new Vector2(0f, 0.5f);
+            checkRect.pivot = new Vector2(0f, 0.5f);
+            checkRect.anchoredPosition = new Vector2(8f, 0f);
+            checkRect.sizeDelta = new Vector2(26f, 26f);
+            checkObject.GetComponent<Image>().color = new Color(0.55f, 0.72f, 0.20f);
+            createdToggle.graphic = checkObject.GetComponent<Image>();
+
+            var textObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            textObject.transform.SetParent(buttonObject.transform, false);
+            var text = textObject.GetComponent<Text>();
+            text.text = "Generate personalized assets";
+            text.alignment = TextAnchor.MiddleLeft;
+            text.color = Color.white;
+            text.font = GameFonts.Body;
+            text.fontSize = 20;
+            var textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = new Vector2(0f, 0f);
+            textRect.anchorMax = new Vector2(1f, 1f);
+            textRect.offsetMin = new Vector2(42f, 0f);
+            textRect.offsetMax = Vector2.zero;
+
+            return createdToggle;
+        }
+
         private void OnEnable()
         {
             GameManager.Instance.OnStateChanged += HandleStateChanged;
@@ -178,7 +244,8 @@ namespace MarioKart.UI
                 pickedImageBytes,
                 pickedImageFileName,
                 description,
-                SelectedSky());
+                SelectedSky(),
+                personalizeToggle.isOn);
             GameManager.Instance.SubmitWorldInput(request);
         }
 

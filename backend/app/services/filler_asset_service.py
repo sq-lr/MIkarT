@@ -26,15 +26,12 @@ from __future__ import annotations
 import base64
 import logging
 from abc import ABC, abstractmethod
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
-logger = logging.getLogger(__name__)
+from app.services.vision_service import Placement
 
-# Deliberately excludes "landmark": filler is generic, interchangeable clutter
-# by definition, never the one centrepiece a landmark is meant to be.
-FillerPlacement = Literal["scattered", "background", "roadside"]
+logger = logging.getLogger(__name__)
 
 
 class FillerAsset(BaseModel):
@@ -43,12 +40,17 @@ class FillerAsset(BaseModel):
 
     `keyword` becomes the library search query (and, if a match is found,
     WorldRecipe.objects[].type); `density` becomes objects[].density;
-    `placement` becomes objects[].placement.
+    `placement` becomes objects[].placement. `placement` normally excludes
+    "landmark" -- filler is generic, interchangeable clutter by definition,
+    never the one centrepiece a landmark is meant to be -- but `suggest()`'s
+    `max_landmarks` can lift that restriction (see docs/decisions/0010-personalize-toggle.md):
+    when personalized (Meshy) generation is turned off, nothing else in the
+    world can supply a landmark, so filler is allowed to nominate 1-2.
     """
 
     keyword: str = Field(min_length=1, max_length=40)
     density: float = Field(ge=0.0, le=1.0)
-    placement: FillerPlacement = "scattered"
+    placement: Placement = "scattered"
 
 
 class FillerAssetExtraction(BaseModel):
@@ -57,7 +59,11 @@ class FillerAssetExtraction(BaseModel):
 
 class FillerAssetService(ABC):
     @abstractmethod
-    def suggest(self, image_bytes: bytes, description: str) -> FillerAssetExtraction:
+    def suggest(self, image_bytes: bytes, description: str, max_landmarks: int = 0) -> FillerAssetExtraction:
+        """`max_landmarks` is normally 0 (filler is never a landmark); pass a
+        positive value only when no other source in this world can supply
+        one, to let filler nominate that many library-searchable centrepieces
+        instead of leaving the world without one at all."""
         raise NotImplementedError
 
 
@@ -65,7 +71,7 @@ class MockFillerAssetService(FillerAssetService):
     """Bootstrap/offline default: suggests nothing. No external call is
     made, so this requires no API key and no network."""
 
-    def suggest(self, image_bytes: bytes, description: str) -> FillerAssetExtraction:
+    def suggest(self, image_bytes: bytes, description: str, max_landmarks: int = 0) -> FillerAssetExtraction:
         return FillerAssetExtraction(filler_assets=[])
 
 
@@ -91,14 +97,14 @@ class ClaudeFillerAssetService(FillerAssetService):
         self._client = client or anthropic.Anthropic()
         self._max_assets = max_assets
 
-    def suggest(self, image_bytes: bytes, description: str) -> FillerAssetExtraction:
-        from app.prompts.filler_asset_extraction import SYSTEM_PROMPT, build_user_prompt
+    def suggest(self, image_bytes: bytes, description: str, max_landmarks: int = 0) -> FillerAssetExtraction:
+        from app.prompts.filler_asset_extraction import build_system_prompt, build_user_prompt
 
         image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
         response = self._client.beta.messages.parse(
             model=_CLAUDE_MODEL,
             max_tokens=2048,
-            system=SYSTEM_PROMPT.format(max_assets=self._max_assets),
+            system=build_system_prompt(self._max_assets, max_landmarks),
             messages=[
                 {
                     "role": "user",
@@ -129,4 +135,18 @@ class ClaudeFillerAssetService(FillerAssetService):
         # The prompt asks for at most max_assets, but enforce it here too:
         # every extra asset is another Poly Pizza search call.
         extraction.filler_assets = extraction.filler_assets[: self._max_assets]
+
+        # Same defense-in-depth for the landmark cap: demote any extra
+        # "landmark" beyond max_landmarks rather than trusting the prompt
+        # alone (the model_synthesis-side MAX_LANDMARKS demotion only
+        # accounts for photo/text sources, not a misbehaving filler call).
+        landmark_count = 0
+        for asset in extraction.filler_assets:
+            if asset.placement != "landmark":
+                continue
+            if landmark_count >= max_landmarks:
+                asset.placement = "scattered"
+            else:
+                landmark_count += 1
+
         return extraction

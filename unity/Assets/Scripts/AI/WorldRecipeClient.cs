@@ -37,6 +37,7 @@ namespace MarioKart.AI
             form.AddBinaryData("image", request.imageBytes, request.imageFileName, "image/jpeg");
             form.AddField("description", request.description);
             form.AddField("sky", request.sky);
+            form.AddField("personalize", request.personalize ? "true" : "false");
 
             string url = $"{config.backendBaseUrl}/generate-world";
             using UnityWebRequest www = UnityWebRequest.Post(url, form);

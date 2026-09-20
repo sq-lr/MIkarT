@@ -12,6 +12,7 @@ from app.services.mesh_generation_service import MeshGenerationService, MeshTask
 from app.services.object_cropper import ObjectCrop, crop_objects
 from app.services.providers import get_providers
 from app.services.text_asset_service import ExtractedAsset
+from app.services.world_synthesis_service import MAX_LANDMARKS
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,11 @@ async def generate_world(
     image: UploadFile = File(...),
     description: str = Form("", max_length=500),
     sky: str = Form("sunny"),
+    # Off by default (see the upload screen's "Generate personalized assets"
+    # toggle): skips Meshy entirely and sources every object -- including up
+    # to MAX_LANDMARKS landmarks -- from library retrieval instead. See
+    # docs/decisions/0010-personalize-toggle.md.
+    personalize: bool = Form(False),
 ) -> WorldRecipeResponse:
     if image.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="image must be image/jpeg or image/png")
@@ -39,25 +45,36 @@ async def generate_world(
     image_bytes = await image.read()
     providers = get_providers()
 
+    # Filler is the only source allowed a landmark when nothing personalized
+    # is being generated -- otherwise the world would have no centrepiece.
+    filler_max_landmarks = 0 if personalize else MAX_LANDMARKS
+
     try:
-        # 1. VLM, text extraction, and filler suggestion are three independent
-        #    Claude calls with no data dependency on each other, so run them
-        #    concurrently -- otherwise they'd stack to roughly triple the
-        #    latency for no reason.
-        with ThreadPoolExecutor(max_workers=3) as claude_pool:
+        # 1. VLM, text extraction, and filler suggestion are independent
+        #    Claude calls with no data dependency on each other, so run
+        #    whichever ones are needed concurrently -- otherwise they'd stack
+        #    to roughly N times the latency for no reason. Text extraction is
+        #    skipped entirely when not personalizing: its whole purpose is
+        #    vivid Meshy generation prompts, which won't be submitted anyway.
+        with ThreadPoolExecutor(max_workers=3 if personalize else 2) as claude_pool:
             vision_future = claude_pool.submit(providers.vision.analyze_image, image_bytes, description)
-            text_future = claude_pool.submit(providers.text_assets.extract, description)
-            filler_future = claude_pool.submit(providers.filler_assets.suggest, image_bytes, description)
+            filler_future = claude_pool.submit(
+                providers.filler_assets.suggest, image_bytes, description, filler_max_landmarks
+            )
+            text_future = claude_pool.submit(providers.text_assets.extract, description) if personalize else None
 
             scene = vision_future.result()  # vision failure fails the world, same as before
 
-            try:
-                key_assets = text_future.result().key_assets[: providers.max_text_assets_per_world]
-            except Exception:
-                # Text-derived assets are a bonus on top of an already-complete
-                # photo-derived world: a broken extraction call only costs
-                # those extra objects, it never fails the whole request.
-                logger.exception("text asset extraction failed; continuing with photo objects only")
+            if text_future is not None:
+                try:
+                    key_assets = text_future.result().key_assets[: providers.max_text_assets_per_world]
+                except Exception:
+                    # Text-derived assets are a bonus on top of an already-complete
+                    # photo-derived world: a broken extraction call only costs
+                    # those extra objects, it never fails the whole request.
+                    logger.exception("text asset extraction failed; continuing with photo objects only")
+                    key_assets = []
+            else:
                 key_assets = []
 
             try:
@@ -67,14 +84,17 @@ async def generate_world(
                 logger.exception("filler asset suggestion failed; continuing without extra filler")
                 filler_candidates = []
 
-        # 2. Cut each detected object out of the source image.
-        crops = crop_objects(image_bytes, scene.detected_objects, providers.max_objects_per_world)
+        # 2. Cut each detected object out of the source image -- skipped
+        #    entirely when not personalizing, since nothing will be submitted
+        #    to Meshy for them anyway.
+        crops = crop_objects(image_bytes, scene.detected_objects, providers.max_objects_per_world) if personalize else []
 
         # 3. Kick off mesh generation, one submission at a time -- image crops
-        #    then text assets, then a library search per filler keyword.
-        #    Unity polls /assets/{task_id} afterwards. A failed submit only
-        #    costs that object its mesh (it keeps a placeholder, or for
-        #    filler is simply dropped); it never fails the world.
+        #    then text assets (both empty when not personalizing), then a
+        #    library search per filler keyword. Unity polls /assets/{task_id}
+        #    afterwards. A failed submit only costs that object its mesh (it
+        #    keeps a placeholder, or for filler is simply dropped); it never
+        #    fails the world.
         image_mesh_tasks, text_mesh_tasks = _submit_mesh_tasks(providers.mesh, crops, key_assets)
         filler_mesh_tasks = _submit_filler_assets(providers.library, filler_candidates)
         for task in image_mesh_tasks + text_mesh_tasks + filler_mesh_tasks:
@@ -91,6 +111,7 @@ async def generate_world(
             filler_mesh_tasks,
             sky=sky,
             max_assets=providers.max_assets_per_world,
+            personalize=personalize,
         )
     except Exception:
         logger.exception("world generation failed")

@@ -64,7 +64,17 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ Generic filler-asset suggestion (Claude, photo+text) + retrieval from a
   public asset library (Poly Pizza) to diversify and fill out the world
   cheaply, for scattered/roadside/background objects only — see
-  docs/decisions/0009-generic-filler-from-poly-pizza.md
+  docs/decisions/0009-generic-filler-from-poly-pizza.md. Which search result
+  (if any) to use is picked by a `MatchPickerService`: a per-keyword Claude
+  semantic pick by default, or free word-overlap scoring
+  (`MATCH_PICKER_PROVIDER=heuristic`) — see
+  docs/decisions/0011-claude-match-picker.md
+✓ "Generate personalized assets" toggle on the upload screen, **off by
+  default**: when off, Meshy is skipped entirely and the whole world
+  (including up to 2 landmarks) is sourced from library retrieval instead,
+  with filler prompted to translate what's actually in the photo/text into
+  generic search terms before rounding out with unrelated filler — see
+  docs/decisions/0010-personalize-toggle.md
 ✓ Async mesh delivery: the world is built on primitive placeholders and
   generated meshes swap in when ready (placeholders stay if generation
   fails). By default the Generating screen waits for the meshes, with a

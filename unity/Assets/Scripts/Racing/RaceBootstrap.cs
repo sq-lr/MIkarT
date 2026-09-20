@@ -84,6 +84,7 @@ namespace MarioKart.Racing
 
                 case GameState.Racing:
                     SetKartsFrozen(false);
+                    if (raceManager != null) raceManager.MarkRacing();
                     break;
 
                 default:

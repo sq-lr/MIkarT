@@ -1,0 +1,74 @@
+Live test: personalize=false pipeline -> ClaudeFillerAssetService.suggest(max_landmarks=2)
+-> FillerAssetExtraction JSON. This is the ENTIRE object list in personalize=false mode
+(no vision/text-to-Meshy objects at all -- see docs/decisions/0010-personalize-toggle.md).
+====================================================================================================
+
+Input image: unity/Assets/Resources/mit_image.png (231927 bytes)
+Input description: 'school campus'
+max_landmarks: 2
+Output:
+{
+  "filler_assets": [
+    {
+      "keyword": "statue",
+      "density": 0.15,
+      "placement": "landmark"
+    },
+    {
+      "keyword": "bare_tree",
+      "density": 0.5,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "street_lamp",
+      "density": 0.45,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "park_bench",
+      "density": 0.35,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "bollard",
+      "density": 0.4,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "trash_can",
+      "density": 0.3,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "bicycle",
+      "density": 0.35,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "bush",
+      "density": 0.5,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "sign",
+      "density": 0.25,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "planter",
+      "density": 0.3,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "building",
+      "density": 0.2,
+      "placement": "background"
+    },
+    {
+      "keyword": "tower",
+      "density": 0.15,
+      "placement": "background"
+    }
+  ]
+}
+----------------------------------------------------------------------------------------------------

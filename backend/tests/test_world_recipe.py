@@ -509,3 +509,48 @@ def test_synthesis_clamps_max_assets_to_schema_ceiling():
 
     assert len(recipe.objects) == 12
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_personalize_false_ignores_photo_and_text_objects():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="lighthouse", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.9, placement="landmark")],
+    )
+    photo_tasks = [MeshTask(task_id="task-lighthouse", object_type="lighthouse", provider="meshy")]
+    text_assets = [ExtractedAsset(label="dragon_statue", prompt="p", density=0.15)]
+    text_tasks = [MeshTask(task_id="task-dragon", object_type="dragon_statue", provider="meshy")]
+    filler_assets = [FillerAsset(keyword="park_bench", density=0.5, placement="roadside")]
+    filler_tasks = [MeshTask(task_id="poly-bench", object_type="park_bench", provider="polypizza")]
+
+    recipe = service.synthesize(
+        scene, "beach", photo_tasks, text_assets, text_tasks, filler_assets, filler_tasks, personalize=False
+    )
+
+    # Photo and text objects are ignored entirely -- even though mesh tasks
+    # were passed in (as if Meshy had actually been called), personalize=False
+    # means the whole world comes from filler only.
+    assert [o.type for o in recipe.objects] == ["park_bench"]
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_personalize_false_allows_filler_landmark():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+    filler_assets = [
+        FillerAsset(keyword="lighthouse", density=0.15, placement="landmark"),
+        FillerAsset(keyword="bench", density=0.5, placement="roadside"),
+    ]
+    filler_tasks = [
+        MeshTask(task_id="poly-lighthouse", object_type="lighthouse", provider="polypizza"),
+        MeshTask(task_id="poly-bench", object_type="bench", provider="polypizza"),
+    ]
+
+    recipe = service.synthesize(scene, "beach", [], [], [], filler_assets, filler_tasks, personalize=False)
+
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["lighthouse"] == "landmark"
+    assert placements["bench"] == "roadside"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
