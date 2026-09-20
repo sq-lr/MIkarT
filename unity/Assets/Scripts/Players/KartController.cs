@@ -58,6 +58,14 @@ namespace MarioKart.Players
         /// <summary>Current steering input in [-1, 1] (read by KartVisual to turn the front wheels).</summary>
         public float Steering => currentInput.steering;
 
+        /// <summary>
+        /// Raised on first contact with anything solid -- a barrier wall or
+        /// the other kart -- with the impact speed in m/s (the kart's own
+        /// speed against a wall, the closing speed against another kart).
+        /// PlayerCamera uses it to shake.
+        /// </summary>
+        public event System.Action<float> Impact;
+
         private void Awake()
         {
             if (rb == null) rb = GetComponent<Rigidbody>();
@@ -100,9 +108,23 @@ namespace MarioKart.Players
         public void OnBarrierHit()
         {
             if (rb.isKinematic) return;
+            float impactSpeed = rb.linearVelocity.magnitude;
             rb.linearVelocity *= 1f - barrierHitSpeedLoss;
             rb.angularVelocity *= barrierHitSpinKeep;
             OnBarrierScrape();
+            Impact?.Invoke(impactSpeed);
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (rb.isKinematic) return;
+            // Walls report through OnBarrierHit (TrackBarrier calls it); this
+            // covers everything else that is solid, i.e. the other kart.
+            if (collision.collider.GetComponent<MarioKart.World.TrackBarrier>() != null) return;
+
+            float closingSpeed = collision.relativeVelocity.magnitude;
+            if (closingSpeed < 1f) return; // resting / nudging contact, no shake
+            Impact?.Invoke(closingSpeed);
         }
 
         /// <summary>Called by TrackBarrier every physics step the kart touches a wall.</summary>

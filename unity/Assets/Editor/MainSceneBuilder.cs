@@ -288,7 +288,7 @@ namespace MarioKart.EditorTools
 
         private static PlayerCamera BuildCamera(string name, int playerIndex, Transform target, bool withAudioListener)
         {
-            var go = new GameObject(name, typeof(Camera), typeof(PlayerCamera), typeof(PaperGrainEffect));
+            var go = new GameObject(name, typeof(Camera), typeof(PlayerCamera), typeof(PaperGrainEffect), typeof(SpeedLinesEffect));
             if (withAudioListener) go.AddComponent<AudioListener>(); // exactly one per scene
 
             var cam = go.GetComponent<Camera>();
