@@ -78,11 +78,14 @@ async def generate_world(
                 key_assets = []
 
             try:
-                filler_candidates = filler_future.result().filler_assets[: providers.max_filler_assets_per_world]
+                filler_extraction = filler_future.result()
+                filler_candidates = filler_extraction.filler_assets[: providers.max_filler_assets_per_world]
+                ground_color = filler_extraction.ground_color
             except Exception:
                 # Same reasoning as text extraction: filler is pure bonus.
                 logger.exception("filler asset suggestion failed; continuing without extra filler")
                 filler_candidates = []
+                ground_color = None
 
         # 2. Cut each detected object out of the source image -- skipped
         #    entirely when not personalizing, since nothing will be submitted
@@ -112,6 +115,7 @@ async def generate_world(
             sky=sky,
             max_assets=providers.max_assets_per_world,
             personalize=personalize,
+            ground_color=ground_color,
         )
     except Exception:
         logger.exception("world generation failed")

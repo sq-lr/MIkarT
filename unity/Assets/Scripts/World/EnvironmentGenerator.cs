@@ -282,6 +282,10 @@ namespace MarioKart.World
                 var go = Spawn(definition, position, yaw, scale, Role.Landmark, rng, layout);
                 if (go != null)
                 {
+                    // Parented to the placeholder, not the (possibly later
+                    // swapped-in) mesh, so it survives regardless of when or
+                    // whether the real mesh ever arrives.
+                    LandmarkGlow.Attach(go);
                     instances.Add(go);
                     placed++;
                 }

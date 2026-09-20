@@ -182,6 +182,24 @@ def test_synthesis_preserves_selected_sky():
     assert recipe.world.sky == "sunset"
 
 
+def test_synthesis_ground_color_overrides_palette_ground_slot():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+
+    recipe = service.synthesize(scene, "make it a beach paradise", ground_color="#2f5233")
+
+    assert recipe.palette[1] == "#2f5233"
+
+
+def test_synthesis_without_ground_color_keeps_the_profiles_own_palette():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+
+    recipe = service.synthesize(scene, "make it a beach paradise")  # ground_color omitted
+
+    assert recipe.palette[1] == "#F4D35E"  # the "tropical" profile's own palette[1], untouched
+
+
 def test_synthesis_selects_track_surface_from_scene():
     service = MockWorldSynthesisService()
     scene = SceneUnderstanding(

@@ -44,6 +44,20 @@ namespace MarioKart.World
             int trackSeed = WorldRandom.DeriveSeed(recipe.seed, "track");
             int envSeed = WorldRandom.DeriveSeed(recipe.seed, "environment");
 
+            // Before BuildTrackVisual: it captures groundRenderer.material
+            // (via TrackMeshBuilder's groundMaterial param) to share with the
+            // freshly-built terrain/embankment mesh -- the ground the player
+            // actually sees beside the track. ApplyTheme replaces
+            // groundRenderer's material outright (not an in-place color
+            // edit), so running it after BuildTrackVisual left the terrain
+            // mesh holding a stale reference to whatever material predated
+            // this call, while only the distant flat ground plane picked up
+            // the new color. None of these three depend on the track,
+            // environment, or obstacles existing yet.
+            ApplyTheme(recipe);
+            ApplySky(recipe.world != null ? recipe.world.sky : "sunny", recipe.palette);
+            ToonStyle.ApplyPalette(recipe.palette, RenderSettings.ambientLight);
+
             var track = new TrackGenerator().Generate(recipe, trackSeed);
             CurrentTrack = track;
 
@@ -57,10 +71,6 @@ namespace MarioKart.World
 
             var obstacles = EnsureObstacleGenerator();
             obstacles.Generate(track, recipe.seed);
-
-            ApplyTheme(recipe);
-            ApplySky(recipe.world != null ? recipe.world.sky : "sunny", recipe.palette);
-            ToonStyle.ApplyPalette(recipe.palette, RenderSettings.ambientLight);
 
             var config = MarioKart.Core.GameManager.Instance != null ? MarioKart.Core.GameManager.Instance.Config : null;
             ToonStyle.ConfigureShadows(sunLight, config != null ? config.shadowDistance : 70f);
@@ -186,8 +196,10 @@ namespace MarioKart.World
             var palette = recipe?.palette;
             string sky = recipe?.world?.sky?.ToLowerInvariant() ?? "sunny";
             ColorUtility.TryParseHtmlString(palette != null && palette.Count > 0 ? palette[0] : "#F4E6C0", out var sunColor);
-            ColorUtility.TryParseHtmlString(palette != null && palette.Count > 1 ? palette[1] : "#6B8F4A", out var groundColor);
+            string groundColorHex = palette != null && palette.Count > 1 ? palette[1] : "#6B8F4A";
+            ColorUtility.TryParseHtmlString(groundColorHex, out var groundColor);
             ColorUtility.TryParseHtmlString(palette != null && palette.Count > 2 ? palette[2] : "#A8C8DC", out var accent);
+            Debug.Log($"[WorldGenerator] ground_color = {groundColorHex}");
 
             groundColor = Color.Lerp(groundColor, GhibliLook.Moss, 0.45f);
             sunColor = Color.Lerp(sunColor, new Color(1f, 0.93f, 0.75f), 0.45f);

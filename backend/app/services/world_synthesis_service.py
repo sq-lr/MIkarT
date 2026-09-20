@@ -55,6 +55,7 @@ class WorldSynthesisService(ABC):
         sky: str = "sunny",
         max_assets: int = _SCHEMA_MAX_RECIPE_OBJECTS,
         personalize: bool = True,
+        ground_color: str | None = None,
     ) -> WorldRecipe:
         """`mesh_tasks` are the in-flight mesh generations for this world, one
         per detected object type that was successfully submitted; each becomes
@@ -74,7 +75,12 @@ class WorldSynthesisService(ABC):
         by convention were requested with landmarks allowed in that case (see
         docs/decisions/0012-personalize-toggle.md) -- `mesh_tasks`/`text_mesh_tasks`
         should be empty when `personalize` is False, since nothing should have
-        been submitted to Meshy."""
+        been submitted to Meshy. `ground_color` overrides palette[1] (the
+        ground/terrain slot Unity's WorldGenerator.ApplyTheme already reads --
+        see docs.world-recipe.md) with the filler extraction's theme-matched
+        suggestion (app.services.filler_asset_service.FillerAssetExtraction.ground_color)
+        when Claude produced one; falls back to the canned profile's own
+        palette[1] when None (mock filler, or a failed extraction)."""
         raise NotImplementedError
 
 
@@ -304,6 +310,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
         sky: str = "sunny",
         max_assets: int = _SCHEMA_MAX_RECIPE_OBJECTS,
         personalize: bool = True,
+        ground_color: str | None = None,
     ) -> WorldRecipe:
         max_assets = min(max_assets, _SCHEMA_MAX_RECIPE_OBJECTS)
         profile_key = _pick_profile_key(scene, description)
@@ -336,6 +343,10 @@ class MockWorldSynthesisService(WorldSynthesisService):
             logger.warning("world has %d objects, truncating to %d", len(objects), max_assets)
             objects = objects[:max_assets]
 
+        palette = list(profile["palette"])
+        if ground_color:
+            palette[1] = ground_color
+
         return WorldRecipe(
             version=1,
             seed=seed,
@@ -350,5 +361,5 @@ class MockWorldSynthesisService(WorldSynthesisService):
             ),
             track=TrackInfo(width=16.0, length=800.0, difficulty=0.5, surface=scene.track_surface),
             objects=objects,
-            palette=list(profile["palette"]),
+            palette=palette,
         )

@@ -55,6 +55,14 @@ class FillerAsset(BaseModel):
 
 class FillerAssetExtraction(BaseModel):
     filler_assets: list[FillerAsset] = Field(default_factory=list)
+    # A hex color for the ground/grass verge alongside the track, matching
+    # the scene's theme (see app.prompts.filler_asset_extraction), wired into
+    # WorldRecipe.palette[1] by world_synthesis_service.synthesize(). None
+    # (not a hardcoded fallback color) when nothing was actually suggested --
+    # MockFillerAssetService's whole point is to suggest nothing, so it must
+    # not silently override a canned theme profile's own palette[1] with some
+    # arbitrary color; a failed real extraction falls back the same way.
+    ground_color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
 class FillerAssetService(ABC):

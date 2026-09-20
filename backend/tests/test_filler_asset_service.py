@@ -71,6 +71,22 @@ def test_filler_asset_placement_allows_all_four_values():
         FillerAsset(keyword="x", density=0.5, placement=placement)
 
 
+def test_extraction_ground_color_defaults_to_none_and_validates_hex_format():
+    # None (not a hardcoded color) so a no-op/failed extraction never
+    # overrides a canned theme profile's own palette[1] -- see
+    # world_synthesis_service.synthesize()'s ground_color param.
+    assert FillerAssetExtraction().ground_color is None
+    FillerAssetExtraction(ground_color="#2f5233")  # lowercase hex is fine
+    with pytest.raises(ValueError):
+        FillerAssetExtraction(ground_color="not-a-color")
+
+
+def test_mock_suggests_no_ground_color():
+    service = MockFillerAssetService()
+    result = service.suggest(make_png(), "a beach")
+    assert result.ground_color is None
+
+
 def test_claude_suggest_demotes_landmarks_beyond_max_landmarks():
     extraction = FillerAssetExtraction(
         filler_assets=[
@@ -102,4 +118,4 @@ def test_claude_suggest_demotes_all_landmarks_when_max_landmarks_zero():
     result = service.suggest(make_png(), "a beach")  # max_landmarks defaults to 0
 
     assert result.filler_assets[0].placement == "scattered"
-    assert "Never" in messages.calls[0]["system"]  # the max_landmarks=0 prompt variant
+    assert "LANDMARK" not in messages.calls[0]["system"]  # the max_landmarks=0 prompt variant has no landmark step
