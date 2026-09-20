@@ -18,6 +18,8 @@ _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
 _SKY_VALUES = {"sunny", "cloudy", "sunset", "night"}
+# Mirrors Mood in vision_service.py; Unity maps it to a soundtrack.
+_MOOD_VALUES = {"cheerful", "chill", "epic", "spooky", "energetic"}
 _TRACK_SURFACE_VALUES = {"concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"}
 _ASSET_PROVIDER_VALUES = {"meshy", "polypizza"}
 # How Unity should use an object, as judged by the vision model. Mirrors the
@@ -54,6 +56,7 @@ class WorldInfo(BaseModel):
     weather: str
     time_of_day: str
     sky: str = "sunny"
+    mood: str = "energetic"
 
     @field_validator("terrain")
     @classmethod
@@ -81,6 +84,13 @@ class WorldInfo(BaseModel):
     def _valid_sky(cls, v: str) -> str:
         if v not in _SKY_VALUES:
             raise ValueError(f"sky must be one of {sorted(_SKY_VALUES)}")
+        return v
+
+    @field_validator("mood")
+    @classmethod
+    def _valid_mood(cls, v: str) -> str:
+        if v not in _MOOD_VALUES:
+            raise ValueError(f"mood must be one of {sorted(_MOOD_VALUES)}")
         return v
 
 

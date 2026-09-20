@@ -1,6 +1,7 @@
 using System.IO;
 using MarioKart.AI;
 using MarioKart.AssetsSystem;
+using MarioKart.Audio;
 using MarioKart.CameraSystem;
 using MarioKart.Core;
 using MarioKart.InputSystem;
@@ -76,6 +77,7 @@ namespace MarioKart.EditorTools
 
             // ---- GameManager + backend clients --------------------------------
             var gameManager = new GameObject("GameManager", typeof(GameManager)).GetComponent<GameManager>();
+            var music = gameManager.gameObject.AddComponent<MusicPlayer>(); // mood soundtrack; builds its own AudioSource
             var backend = new GameObject("Backend", typeof(WorldRecipeClient), typeof(MeshAssetClient));
             backend.transform.SetParent(gameManager.transform);
             var recipeClient = backend.GetComponent<WorldRecipeClient>();
@@ -136,6 +138,7 @@ namespace MarioKart.EditorTools
             Set(gameManager, "recipeClient", recipeClient);
             Set(gameManager, "meshAssetClient", meshClient);
             Set(gameManager, "worldGenerator", worldGenerator);
+            Set(music, "worldGenerator", worldGenerator);
             Set(gameManager, "raceManager", raceManager);
             Set(gameManager, "resultsUI", results);
 
@@ -273,6 +276,8 @@ namespace MarioKart.EditorTools
             kart.AddComponent<KartVisual>();      // builds the wheels/body/driver meshes at runtime
             kart.AddComponent<KartSpeedEffect>(); // builds its own particle systems at runtime
             kart.AddComponent<KartSkidEffect>();  // likewise: smoke, sparks, skid marks
+            var audio = kart.AddComponent<KartAudio>(); // engine loops + one-shots from Resources/Audio
+            audio.pitchOffset = playerIndex == 2 ? 0.04f : -0.04f; // the two engines shouldn't phase
 
             Set(controller, "rb", rb);
             Set(player, "input", input);

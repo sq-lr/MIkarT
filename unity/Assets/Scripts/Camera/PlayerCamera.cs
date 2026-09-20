@@ -13,6 +13,11 @@ namespace MarioKart.CameraSystem
     /// "trauma" that decays over `shakeDuration`, and the frame is offset
     /// and rolled by trauma² × noise on top of the smoothed follow pose (so
     /// the shake never feeds back into the follow lerp).
+    ///
+    /// And the speed zoom: near the kart's top speed the field of view
+    /// widens a few degrees (a slight zoom-out, the classic sense-of-speed
+    /// trick), on this camera only, ramping over the same speed band as the
+    /// SpeedLinesEffect so the two read as one effect.
     /// </summary>
     public class PlayerCamera : MonoBehaviour
     {
@@ -38,11 +43,21 @@ namespace MarioKart.CameraSystem
         [Tooltip("Trauma added by a wall or kart hit at the kart's top speed; a slow tap adds a third of this.")]
         [Range(0f, 1f)] public float impactTrauma = 0.7f;
 
+        [Header("Speed zoom")]
+        [Tooltip("Extra field of view (degrees) at top speed -- a slight zoom-out. 0 disables.")]
+        public float speedZoomDegrees = 6f;
+        [Tooltip("Fraction of maxSpeed at which the zoom starts; full at maxSpeed. Matches SpeedLinesEffect.")]
+        [Range(0f, 1f)] public float speedZoomActivation = 0.9f;
+        [Tooltip("How quickly the zoom follows speed changes, per second.")]
+        public float speedZoomResponse = 6f;
+
         private KartController hookedKart;
         private Vector3 followPosition;
         private Quaternion followRotation;
         private float trauma;      // 0..1, decays linearly
         private float noiseOffset; // per-camera so the two halves don't shake in sync
+        private float baseFieldOfView;
+        private float speedZoom;   // 0..1, smoothed
 
         public Transform Target => target;
 
@@ -71,6 +86,11 @@ namespace MarioKart.CameraSystem
             followPosition = DesiredPosition;
             followRotation = DesiredRotation;
             trauma = 0f;
+            speedZoom = 0f;
+            // Only touch the FOV once Awake has recorded the base value: the
+            // scene builder calls this in the Editor, where Awake never runs,
+            // and writing 0 there bakes a pinhole camera into the scene.
+            if (cam != null && baseFieldOfView > 0f) cam.fieldOfView = baseFieldOfView;
             transform.SetPositionAndRotation(followPosition, followRotation);
         }
 
@@ -84,6 +104,14 @@ namespace MarioKart.CameraSystem
         {
             if (cam == null) cam = GetComponent<Camera>();
             noiseOffset = GetInstanceID() * 0.137f;
+            baseFieldOfView = cam != null ? cam.fieldOfView : 60f;
+            if (baseFieldOfView < 1f)
+            {
+                // A scene saved with a pinhole FOV (an earlier builder bug)
+                // would otherwise stay unusable: fall back to the default.
+                baseFieldOfView = 60f;
+                if (cam != null) cam.fieldOfView = baseFieldOfView;
+            }
             followPosition = transform.position;
             followRotation = transform.rotation;
 
@@ -138,6 +166,8 @@ namespace MarioKart.CameraSystem
             followPosition = Vector3.Lerp(followPosition, DesiredPosition, followLerp * dt);
             followRotation = Quaternion.Slerp(followRotation, DesiredRotation, followLerp * dt);
 
+            UpdateSpeedZoom(dt);
+
             if (trauma <= 0f)
             {
                 transform.SetPositionAndRotation(followPosition, followRotation);
@@ -157,6 +187,24 @@ namespace MarioKart.CameraSystem
                 followRotation * Quaternion.Euler(0f, 0f, roll));
 
             trauma = Mathf.Max(0f, trauma - dt / Mathf.Max(0.01f, shakeDuration));
+        }
+
+        /// <summary>
+        /// Widen the FOV toward `speedZoomDegrees` as the followed kart nears
+        /// its top speed (boosting past it counts as full). Eased so a wall
+        /// scrape or a lifted throttle pulls the view back in smoothly.
+        /// </summary>
+        private void UpdateSpeedZoom(float dt)
+        {
+            if (cam == null) return;
+            float raw = 0f;
+            if (hookedKart != null && speedZoomDegrees != 0f)
+            {
+                float start = hookedKart.maxSpeed * speedZoomActivation;
+                raw = Mathf.InverseLerp(start, hookedKart.maxSpeed, hookedKart.ForwardSpeed);
+            }
+            speedZoom = Mathf.Lerp(speedZoom, raw, 1f - Mathf.Exp(-speedZoomResponse * dt));
+            cam.fieldOfView = baseFieldOfView + speedZoomDegrees * speedZoom;
         }
 
         private void HookTarget()

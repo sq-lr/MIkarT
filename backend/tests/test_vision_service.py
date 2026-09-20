@@ -86,6 +86,14 @@ def test_mock_profiles_cover_every_placement():
     assert seen == {"landmark", "roadside", "background", "scattered"}
 
 
+def test_mock_profiles_have_a_valid_mood():
+    from app.services.vision_service import _MOCK_PROFILES
+    from app.models.world_recipe import _MOOD_VALUES
+
+    assert {profile.mood for profile in _MOCK_PROFILES} <= _MOOD_VALUES
+    assert SceneUnderstanding(dominant_colors=["#000000"], brightness=0.5, tags=["x"]).mood == "energetic"
+
+
 def test_detected_object_bbox_validation():
     with pytest.raises(ValueError):
         DetectedObject(label="x", bbox=[1.2, 0.0, 0.1, 0.1], prominence=0.5)

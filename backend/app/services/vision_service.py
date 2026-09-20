@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 # Keep in sync with PLACEMENT_VALUES in app.models.world_recipe.
 Placement = Literal["landmark", "roadside", "background", "scattered"]
 TrackSurface = Literal["concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"]
+# The feel of the world, judged from the photo and the player's description;
+# picks the soundtrack in Unity (Resources/Audio/Music/music_<mood>).
+Mood = Literal["cheerful", "chill", "epic", "spooky", "energetic"]
 
 
 class DetectedObject(BaseModel):
@@ -59,6 +62,7 @@ class SceneUnderstanding(BaseModel):
     brightness: float
     tags: list[str]
     track_surface: TrackSurface = "concrete"
+    mood: Mood = "energetic"
     detected_objects: list[DetectedObject] = Field(default_factory=list)
 
 
@@ -73,6 +77,7 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.8,
         tags=["beach", "tropical", "water"],
         track_surface="stone_slabs",
+        mood="cheerful",
         detected_objects=[
             DetectedObject(label="palm_tree", bbox=[0.10, 0.10, 0.30, 0.70], prominence=0.5, placement="roadside"),
             DetectedObject(label="rock", bbox=[0.60, 0.60, 0.25, 0.25], prominence=0.2, placement="scattered"),
@@ -83,6 +88,7 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.9,
         tags=["snow", "mountain", "cold"],
         track_surface="grey_tiles",
+        mood="epic",
         detected_objects=[
             DetectedObject(label="pine_tree", bbox=[0.15, 0.05, 0.25, 0.80], prominence=0.6, placement="scattered"),
             DetectedObject(label="rock", bbox=[0.55, 0.65, 0.30, 0.25], prominence=0.3, placement="background"),
@@ -93,6 +99,7 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.7,
         tags=["desert", "sand", "dry"],
         track_surface="dirt",
+        mood="chill",
         detected_objects=[
             DetectedObject(label="cactus", bbox=[0.40, 0.20, 0.20, 0.60], prominence=0.4, placement="scattered"),
             DetectedObject(label="rock", bbox=[0.05, 0.70, 0.25, 0.20], prominence=0.4, placement="landmark"),
@@ -103,6 +110,7 @@ _MOCK_PROFILES: list[SceneUnderstanding] = [
         brightness=0.5,
         tags=["forest", "grass", "green"],
         track_surface="dirt",
+        mood="chill",
         detected_objects=[
             DetectedObject(label="tree", bbox=[0.20, 0.00, 0.35, 0.90], prominence=0.7, placement="scattered"),
             DetectedObject(label="bush", bbox=[0.65, 0.60, 0.30, 0.30], prominence=0.3, placement="scattered"),

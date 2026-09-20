@@ -315,6 +315,7 @@ class MockWorldSynthesisService(WorldSynthesisService):
                 weather=profile["weather"],
                 time_of_day=profile["time_of_day"],
                 sky=sky,
+                mood=scene.mood,
             ),
             track=TrackInfo(width=16.0, length=800.0, difficulty=0.5, surface=scene.track_surface),
             objects=objects,

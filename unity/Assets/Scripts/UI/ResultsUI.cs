@@ -19,6 +19,7 @@ namespace MarioKart.UI
         private void Awake()
         {
             playAgainButton.onClick.AddListener(OnPlayAgainClicked);
+            UISounds.Attach(playAgainButton);
         }
 
         private void OnEnable()

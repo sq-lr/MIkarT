@@ -46,6 +46,10 @@ namespace MarioKart.UI
             nightSkyToggle.group = skyToggleGroup;
             sunnySkyToggle.isOn = true;
             generateButton.interactable = false;
+            foreach (var control in new Selectable[] { chooseImageButton, generateButton, sunnySkyToggle, cloudySkyToggle, sunsetSkyToggle, nightSkyToggle })
+            {
+                UISounds.Attach(control);
+            }
         }
 
         private void EnsureSkyOptions()

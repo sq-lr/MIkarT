@@ -81,13 +81,25 @@ namespace MarioKart.Players
         /// <summary>Current steering input in [-1, 1] (read by KartVisual to turn the front wheels).</summary>
         public float Steering => currentInput.steering;
 
+        /// <summary>Current throttle input in [0, 1] (read by KartAudio to rev the engine).</summary>
+        public float Throttle => currentInput.throttle;
+
+        /// <summary>Current brake / reverse input in [0, 1] (read by KartAudio to drop the revs).</summary>
+        public float Brake => currentInput.brake;
+
         /// <summary>
         /// Raised on first contact with anything solid -- a barrier wall or
         /// the other kart -- with the impact speed in m/s (the kart's own
         /// speed against a wall, the closing speed against another kart).
-        /// PlayerCamera uses it to shake.
+        /// PlayerCamera uses it to shake, KartAudio to play a hit.
         /// </summary>
         public event System.Action<float> Impact;
+
+        /// <summary>Raised when a boost pickup takes effect. KartAudio plays the power-up jingle.</summary>
+        public event System.Action PowerUp;
+
+        /// <summary>Raised when a paralyze or spin pickup takes effect. KartAudio plays the power-down sound.</summary>
+        public event System.Action PowerDown;
 
         private void Awake()
         {
@@ -110,6 +122,10 @@ namespace MarioKart.Players
             if (GetComponent<KartVisual>() == null)
             {
                 gameObject.AddComponent<KartVisual>();
+            }
+            if (GetComponent<KartAudio>() == null)
+            {
+                gameObject.AddComponent<KartAudio>();
             }
         }
 
@@ -150,6 +166,7 @@ namespace MarioKart.Players
                 float add = Mathf.Min(target - forwardSpeed, maxSpeed * 0.45f);
                 rb.linearVelocity = velocity + transform.forward * add;
             }
+            PowerUp?.Invoke();
         }
 
         /// <summary>Freeze horizontal motion and ignore input. Called by TrackObstacle.</summary>
@@ -160,6 +177,7 @@ namespace MarioKart.Players
             rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
             rb.angularVelocity = Vector3.zero;
             spinRemainingDeg = 0f;
+            PowerDown?.Invoke();
         }
 
         /// <summary>
@@ -173,6 +191,7 @@ namespace MarioKart.Players
             spinRemainingDeg = Mathf.Abs(turns) * 360f;
             float duration = Mathf.Lerp(0.35f, 0.85f, Mathf.InverseLerp(0.25f, 1.25f, Mathf.Abs(turns)));
             spinRateDeg = spinRemainingDeg / Mathf.Max(0.2f, duration);
+            PowerDown?.Invoke();
         }
 
         /// <summary>Called by TrackBarrier on first contact with a wall.</summary>

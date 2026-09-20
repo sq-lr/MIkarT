@@ -24,6 +24,7 @@ namespace MarioKart.AI
                     weather = "haze",
                     time_of_day = "day",
                     sky = "sunny",
+                    mood = "energetic",
                 },
                 track = new TrackInfo { width = 16f, length = 600f, difficulty = 0.4f, surface = "concrete" },
                 objects = new List<WorldObjectEntry>

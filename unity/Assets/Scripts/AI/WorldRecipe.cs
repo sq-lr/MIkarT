@@ -16,6 +16,8 @@ namespace MarioKart.AI
         public string weather;
         public string time_of_day;
         public string sky = "sunny";
+        // Picks the soundtrack (Resources/Audio/Music/music_<mood>); see MusicPlayer.
+        public string mood = "energetic";
     }
 
     [Serializable]

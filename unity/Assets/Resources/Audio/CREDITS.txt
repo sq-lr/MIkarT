@@ -1,0 +1,58 @@
+Sound effects used by Assets/Scripts/Players/KartAudio.cs,
+Assets/Scripts/UI/UISounds.cs and UI/GenerationUI.cs, and the music
+loops used by Assets/Scripts/Audio/MusicPlayer.cs, fetched (and, for
+the effects, trimmed) by tools/sfx/fetch_sfx.py.
+
+All clips are CC0 1.0 (public domain dedication,
+https://creativecommons.org/publicdomain/zero/1.0/). Attribution is
+not required but the authors deserve it.
+
+Kart sounds, from Freesound:
+
+- kart_engine.wav (3.97s)
+    "Noise: Cartoon Car Engine" by NicknameLarry -- https://freesound.org/s/487508/
+    steady putt-putt, the one engine loop: KartAudio pitches it up to rev. (A synth 'racing' clip was tried as a second layer and dropped -- it sweeps in pitch, so it audibly restarts every loop.)
+- kart_screech_0.wav (0.84s), kart_screech_1.wav (0.93s), kart_screech_2.wav (0.52s), kart_screech_3.wav (0.75s), kart_screech_4.wav (0.78s), kart_screech_5.wav (0.85s)
+    "Skrrt.wav" by elliottdj -- https://freesound.org/s/685910/
+    a run of separate mouth-made 'skrrt's -- split into one-shot variants
+- kart_hit_0.wav (0.58s), kart_hit_1.wav (0.48s), kart_hit_2.wav (0.40s), kart_hit_3.wav (0.43s)
+    "TOONImpt - 4 Strong hits with a little tail" by JustWatson64 -- https://freesound.org/s/866950/
+    four toon clangs about a second apart
+- pickup_powerup.wav (1.60s)
+    "Powerup 3" by JustInvoke -- https://freesound.org/s/138491/
+    organ jingle; tail past 1.6 s is silence
+- pickup_powerdown.wav (1.85s)
+    "Power Down" by noirenex -- https://freesound.org/s/159399/
+- countdown_beep.wav (0.50s)
+    "Short beep countdown" by gurie -- https://freesound.org/s/368779/
+    the first of its four identical beeps; GenerationUI pitches it up per tick
+- countdown_go.wav (2.30s)
+    "airhorn-short.wav" by guitarguy1985 -- https://freesound.org/s/68999/
+    quick air horn with its echo, for GO!
+
+UI sounds, from Kenney's asset packs (https://kenney.nl):
+
+- ui_hover.wav (0.06s)
+    Audio/rollover2.ogg from "UI Audio" -- https://kenney.nl/assets/ui-audio
+    soft 60 ms tick for mouse-over
+- ui_click.wav (0.29s)
+    Audio/confirmation_001.ogg from "Interface Sounds" -- https://kenney.nl/assets/interface-sounds
+    short bright chime for a button press
+
+Music (one loop per world mood, kept as the Freesound preview MP3):
+
+- Music/music_cheerful.mp3
+    "Upbeat Game Loop - Aurora Ride" by Venus17 -- https://freesound.org/s/841299/
+    123 bpm, 31 s; bright and bouncy
+- Music/music_chill.mp3
+    "Lo-Fi Piano Loop A - Garden Amin 75 BPM" by holizna -- https://freesound.org/s/866738/
+    75 bpm, 26 s; mellow lo-fi piano
+- Music/music_epic.mp3
+    "Orchestral Loop 2" by Ncone -- https://freesound.org/s/755409/
+    40 s; heroic orchestral
+- Music/music_spooky.mp3
+    "hide loop" by ADnova -- https://freesound.org/s/443987/
+    100 bpm, 1:55; atmospheric with a light beat
+- Music/music_energetic.mp3
+    "Hyperactive chiptune loop" by Rolly-SFX -- https://freesound.org/s/626274/
+    30 s; fast chiptune

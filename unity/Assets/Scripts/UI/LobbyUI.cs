@@ -16,6 +16,7 @@ namespace MarioKart.UI
         private void Awake()
         {
             startButton.onClick.AddListener(OnStartClicked);
+            UISounds.Attach(startButton);
         }
 
         private void OnEnable()

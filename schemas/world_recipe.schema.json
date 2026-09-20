@@ -51,6 +51,12 @@
           "type": "string",
           "enum": ["sunny", "cloudy", "sunset", "night"],
           "default": "sunny"
+        },
+        "mood": {
+          "description": "The feel of the world, chosen by the vision model from the photo and the player's description (the description wins when it implies a mood). Unity plays the matching soundtrack (Resources/Audio/Music/music_<mood>). Defaults to 'energetic' for older recipes. Added backwards-compatibly (version stays 1).",
+          "type": "string",
+          "enum": ["cheerful", "chill", "epic", "spooky", "energetic"],
+          "default": "energetic"
         }
       }
     },

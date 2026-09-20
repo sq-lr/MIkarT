@@ -11,10 +11,14 @@ namespace MarioKart.Racing
     /// owns this: GameManager only exposes BeginCountdown/BeginRace, the UI
     /// never mutates state, and WorldGenerator only knows about the track.
     ///
-    /// On WorldReady: park both karts on the start line of the generated
-    /// track (frozen), reset lap progress, and start the countdown. On
-    /// Racing: unfreeze them. In every other state the karts stay kinematic
-    /// so nobody can drive around the lobby or the results screen.
+    /// As soon as WorldGenerator has built a track (its OnWorldReady, which
+    /// fires before any wait for generated meshes): park both karts on the
+    /// start line and snap the cameras behind them, so the Generating
+    /// screen's dimmed backdrop shows the start line rather than the
+    /// cameras buried in the terrain at the loop's centre. On the WorldReady
+    /// state: re-park (frozen), reset lap progress, and start the countdown.
+    /// On Racing: unfreeze them. In every other state the karts stay
+    /// kinematic so nobody can drive around the lobby or the results screen.
     /// </summary>
     public class RaceBootstrap : MonoBehaviour
     {
@@ -39,6 +43,7 @@ namespace MarioKart.Racing
             SetKartsFrozen(true);
 
             GameManager.Instance.OnStateChanged += HandleStateChanged;
+            if (worldGenerator != null) worldGenerator.OnWorldReady += HandleWorldGenerated;
         }
 
         private void OnDestroy()
@@ -47,6 +52,17 @@ namespace MarioKart.Racing
             {
                 GameManager.Instance.OnStateChanged -= HandleStateChanged;
             }
+            if (worldGenerator != null) worldGenerator.OnWorldReady -= HandleWorldGenerated;
+        }
+
+        /// <summary>
+        /// The track exists (placeholders and all); get the karts and cameras
+        /// onto it now, before the Generating screen lifts.
+        /// </summary>
+        private void HandleWorldGenerated()
+        {
+            PlaceKartsOnStartLine();
+            foreach (var cam in cameras) if (cam != null) cam.SnapToTarget();
         }
 
         private void HandleStateChanged(GameState state)

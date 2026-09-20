@@ -19,7 +19,7 @@ world.
 One Image + One Text Description
         ↓
 AI backend (FastAPI, mock by default)
-  VLM (Claude vision)      → scene info + object bounding boxes
+  VLM (Claude vision)      → scene info + mood + object bounding boxes
   ObjectCropper            → one image crop per object
   Text-asset extraction    → key props named in the description (Claude)
   Filler-asset suggestion  → generic search keywords to diversify (Claude)
@@ -78,6 +78,18 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   docs/decisions/0008-toon-shading.md); matching cartoon particle effects
   (outlined hard-edged shapes, stepped colours, shrink-out) in
   `Players/KartParticles.cs`
+✓ Comic SFX per kart (putt-putt engine loop revved by the accelerator key, skid "skrrt", hit clang,
+  power-up/down stings) from CC0 Freesound clips in `Resources/Audio/`
+  (`Players/KartAudio.cs`; `tools/sfx/fetch_sfx.py` fetches + trims them,
+  `Resources/Audio/CREDITS.txt` lists sources), plus UI hover/press sounds
+  on every button and toggle (`UI/UISounds.cs`, Kenney CC0), and a big
+  animated comic countdown (popping numerals over a starburst, beeps and an
+  air horn on GO! — `UI/GenerationUI.cs`)
+✓ Mood-matched soundtrack: the VLM picks `world.mood` (cheerful | chill |
+  epic | spooky | energetic) from the photo + description, and Unity's
+  `Audio/MusicPlayer.cs` loops the matching CC0 track from
+  `Resources/Audio/Music/` from the countdown through results — see
+  docs/decisions/0010-mood-soundtracks.md. No world ambience or dynamic music
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking

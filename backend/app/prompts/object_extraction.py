@@ -22,6 +22,14 @@ exactly one of "concrete", "red_bricks", "grey_tiles", "stone_slabs", or "dirt".
 Use concrete for modern paved roads, red_bricks for brick streets, grey_tiles for \
 regular tile paving, stone_slabs for irregular stone paths, and dirt for unpaved \
 trails or natural ground.
+- mood: the feel of the world, exactly one of "cheerful", "chill", "epic", \
+"spooky", or "energetic"; it picks the race soundtrack. Use cheerful for bright, \
+sunny, playful scenes (beaches, parks, cartoons, toys); chill for calm, relaxed, \
+cosy or nostalgic ones (forests, countryside, lakes, cafes); epic for grand, \
+heroic, adventurous ones (mountains, castles, canyons, ruins); spooky for dark, \
+eerie, night-time, haunted or abandoned ones; energetic for fast, intense, urban \
+ones (cities, neon, arcades, industrial areas, racetracks). The player's \
+description wins when it names or implies a mood; otherwise judge from the photo.
 - detected_objects: up to {max_objects} distinct, physically separable objects that \
 would make good trackside 3D decoration props, ordered from most to least visually \
 important. For each object give:

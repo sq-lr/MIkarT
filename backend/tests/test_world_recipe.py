@@ -204,6 +204,30 @@ def test_track_surface_values_are_validated():
         WorldRecipe.model_validate(data)
 
 
+def test_synthesis_carries_mood_from_scene():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#1A1A2E"],
+        brightness=0.2,
+        tags=["night", "graveyard"],
+        mood="spooky",
+    )
+
+    recipe = service.synthesize(scene, "a haunted graveyard at midnight")
+
+    assert recipe.world.mood == "spooky"
+
+
+def test_mood_defaults_to_energetic_and_is_validated():
+    data = json.loads(json.dumps(VALID_RECIPE))
+    data["world"].pop("mood", None)
+    assert WorldRecipe.model_validate(data).world.mood == "energetic"
+
+    data["world"]["mood"] = "melancholic"
+    with pytest.raises(ValidationError):
+        WorldRecipe.model_validate(data)
+
+
 def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
     service = MockWorldSynthesisService()
     scene = SceneUnderstanding(

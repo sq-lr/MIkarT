@@ -31,12 +31,16 @@ namespace MarioKart.World
 
         public GeneratedTrack CurrentTrack { get; private set; }
 
+        /// <summary>The recipe the current world was built from (set before OnWorldReady fires).</summary>
+        public WorldRecipe CurrentRecipe { get; private set; }
+
         /// <summary>The generated-mesh loader, so GameManager can wait on it.</summary>
         public MarioKart.AssetsSystem.GeneratedMeshLoader MeshLoader =>
             environmentGenerator != null ? environmentGenerator.MeshLoader : null;
 
         public void Generate(WorldRecipe recipe)
         {
+            CurrentRecipe = recipe;
             int trackSeed = WorldRandom.DeriveSeed(recipe.seed, "track");
             int envSeed = WorldRandom.DeriveSeed(recipe.seed, "environment");
 
