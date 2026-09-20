@@ -92,7 +92,9 @@ def test_submit_sends_data_uri_with_bearer_auth(meshy):
     assert request.headers["authorization"] == "Bearer secret"
     body = json.loads(request.content)
     assert body["image_url"] == "data:image/png;base64," + base64.standard_b64encode(b"\x89PNGfake").decode()
-    assert body["model_type"] == "lowpoly" and body["should_texture"] is True
+    assert body["model_type"] == "standard" and body["should_texture"] is True
+    assert body["ai_model"] == "meshy-7.1"
+    assert body["should_remesh"] is True and body["target_polycount"] == 8000
 
 
 def test_status_mapping(meshy):

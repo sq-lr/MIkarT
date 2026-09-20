@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using MarioKart.AI;
 using MarioKart.AssetsSystem;
 using MarioKart.Core;
+using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.World
@@ -397,9 +398,12 @@ namespace MarioKart.World
 
             if (definition.prefab == null && renderer != null)
             {
-                renderer.material.color = role == Role.Landmark
+                Color tint = role == Role.Landmark
                     ? definition.tintColor
                     : JitterColor(definition.tintColor, hue, sat, val);
+                // Horizon silhouettes stay soft-edged; everything nearer gets
+                // the outline.
+                renderer.sharedMaterial = ToonStyle.Create(tint, outline: role != Role.Horizon, name: instance.name);
             }
 
             // Decoration only: karts are kept on the road by the barriers.

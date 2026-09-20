@@ -55,6 +55,7 @@ namespace MarioKart.Racing
             {
                 case GameState.WorldReady:
                     PlaceKartsOnStartLine();
+                    foreach (var cam in cameras) if (cam != null) cam.SnapToTarget();
                     SetKartsFrozen(true);
                     if (raceManager != null) raceManager.ResetRace();
                     GameManager.Instance.BeginCountdown();

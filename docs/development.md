@@ -49,6 +49,10 @@ project first must run this checklist once, then commit the results:
    Build Settings. Re-run it any time the scene gets into a bad state.
    `Main.unity` is the one and only scene for the whole game — `GameState`
    drives which UI panel is visible, not scene loading.
+   If you only need the kart/ground materials re-pointed at the toon shaders
+   (`Assets/Resources/Shaders/`, see ADR 0008) — e.g. after pulling a shader
+   change — run **MarioKart → Apply Toon Materials** instead; it touches the
+   three `.mat` files and leaves the scene alone.
 4. Commit the generated `.unity`, `.mat`, and `.meta` files (see
    `.gitignore` — `Library/` itself is never committed).
 
@@ -70,8 +74,8 @@ names, so the builder logs an error naming the field if a script renames one.
 | `Directional Light` | `Light` | palette-tinted via `sunLight` |
 | `RaceManager` | `Racing/RaceManager` | `players` → both `LapManager`s |
 | `RaceBootstrap` | `Racing/RaceBootstrap` — the glue: on `WorldReady` parks the karts on the start line and starts the countdown, on `Racing` unfreezes them, sets split-screen viewports | `worldGenerator`, `raceManager`, `karts[2]`, `cameras[2]` |
-| `Kart_P1` / `Kart_P2` | Cube + `Rigidbody` + `Players/KartController` + `Players/PlayerController` + `Input/PlayerInput` (WASD / arrows) + `Racing/LapManager` + `Players/KartSpeedEffect` (top-speed exhaust flames) + `Players/KartSkidEffect` (smoke, sparks, skid marks on contact; both built in code) | `rb`, `input`, `kart`, `playerIndex` |
-| `Camera_P1` / `Camera_P2` | `Camera` (top / bottom half) + `Camera/PlayerCamera`; `AudioListener` on P1 only | `cam`, `target` |
+| `Kart_P1` / `Kart_P2` | Cube (physics body, renderer hidden at runtime) + `Rigidbody` + `Players/KartController` + `Players/PlayerController` + `Input/PlayerInput` (WASD / arrows) + `Racing/LapManager` + `Players/KartVisual` (go-kart body, driver and spinning/steering wheels built from primitive meshes in code, taking the player colour from the cube's material) + `Players/KartSpeedEffect` (top-speed exhaust flames) + `Players/KartSkidEffect` (smoke, sparks, skid marks on contact; both built in code) | `rb`, `input`, `kart`, `playerIndex` |
+| `Camera_P1` / `Camera_P2` | `Camera` (top / bottom half) + `Camera/PlayerCamera` + `Rendering/PaperGrainEffect`; `AudioListener` on P1 only | `cam`, `target` |
 | `Canvas` | Screen-space overlay, 1920×1080 scaler | — |
 | ↳ `LobbyUI` … `ResultsUI` | one always-active holder per `UI/*.cs` script (`LobbyUI`, `ImageUploadUI`, `GenerationUI`, `RaceHUD`, `ResultsUI`), each with a `Panel` child that the script shows/hides. The script must **not** sit on the panel itself: it unsubscribes from `GameManager` in `OnDisable`, so hiding its own GameObject would deafen it permanently | `panel` → the child, buttons, texts, `RaceHUD.player1Laps/player2Laps` |
 | `EventSystem` | `EventSystem` + `StandaloneInputModule` (old Input Manager) | — |

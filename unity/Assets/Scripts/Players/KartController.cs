@@ -55,6 +55,9 @@ namespace MarioKart.Players
 
         public float ForwardSpeed { get; private set; }
 
+        /// <summary>Current steering input in [-1, 1] (read by KartVisual to turn the front wheels).</summary>
+        public float Steering => currentInput.steering;
+
         private void Awake()
         {
             if (rb == null) rb = GetComponent<Rigidbody>();

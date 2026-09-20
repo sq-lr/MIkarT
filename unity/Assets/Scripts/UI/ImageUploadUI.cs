@@ -108,9 +108,7 @@ namespace MarioKart.UI
             text.text = label;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = Color.white;
-            // Arial.ttf was removed from the builtin resources in Unity 2022.2+;
-            // LegacyRuntime.ttf is its replacement (same one MainSceneBuilder uses).
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = GameFonts.Display; // same comic lettering as the scene-built buttons
             textObject.GetComponent<RectTransform>().anchorMin = Vector2.zero;
             textObject.GetComponent<RectTransform>().anchorMax = Vector2.one;
             textObject.GetComponent<RectTransform>().offsetMin = Vector2.zero;
