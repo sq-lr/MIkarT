@@ -66,10 +66,11 @@ names, so the builder logs an error naming the field if a script renames one.
 |---|---|---|
 | `GameManager` | `Core/GameManager` (runs first via `DefaultExecutionOrder(-100)`) | `recipeClient`, `meshAssetClient`, `worldGenerator`, `raceManager`, `resultsUI` |
 | ↳ `Backend` | `AI/WorldRecipeClient`, `AI/MeshAssetClient` | — |
-| `WorldGenerator` | `World/WorldGenerator` | `environmentGenerator`, `trackVisualRoot`, `checkpointRoot`, `sunLight`, `groundRenderer` |
+| `WorldGenerator` | `World/WorldGenerator` | `environmentGenerator`, `trackVisualRoot`, `checkpointRoot`, `obstacleRoot`, `sunLight`, `groundRenderer` |
 | ↳ `EnvironmentGenerator` | `World/EnvironmentGenerator` **and** `Assets/GeneratedMeshLoader` on the same GameObject (not a child — `Generate()` destroys children) | `meshLoader` → self; `GeneratedMeshLoader.client` → `MeshAssetClient` |
-| ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon and two `TrackBarrier` walls (mesh colliders) | — |
+| ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon (mesh collider — it's what the karts drive on, since the road has hills), two `TrackBarrier` walls (mesh colliders), and a `Terrain` height-field mesh (sampled from `GeneratedTrack.GroundHeightAt`, sharing the ground plane's material) that forms the embankments under a raised road | — |
 | ↳ `Checkpoints` | empty; `WorldGenerator` fills it at runtime with trigger gates facing the track tangent | — |
+| ↳ `Obstacles` | `World/ObstacleGenerator`; filled at runtime with pass-through boost / paralyze / spin pickups (colored spheres). Collecting one respawns another elsewhere | created at runtime if missing |
 | ↳ `Ground` | Plane ×60 (600 m) at y = −0.05 | palette-tinted via `groundRenderer` |
 | `Directional Light` | `Light` | palette-tinted via `sunLight` |
 | `RaceManager` | `Racing/RaceManager` | `players` → both `LapManager`s |

@@ -68,6 +68,7 @@ namespace MarioKart.Racing
 
                 case GameState.Racing:
                     SetKartsFrozen(false);
+                    if (raceManager != null) raceManager.MarkRacing();
                     break;
 
                 default:
@@ -111,9 +112,15 @@ namespace MarioKart.Racing
                 // Two-wide grid centred on the track: P1 left, P2 right.
                 float lateral = (i - (karts.Length - 1) * 0.5f) * (track.width * 0.5f);
                 Vector3 position = gridCenter + across * lateral;
-                position.y = kart.transform.localScale.y * 0.5f + 0.05f;
 
-                kart.transform.SetPositionAndRotation(position, Quaternion.LookRotation(forward, Vector3.up));
+                // Flush on the road surface, tilted with it: the karts are
+                // kinematic until the countdown ends, so physics won't
+                // settle them onto a hill for us.
+                float surface = track.SurfaceFrameAt(position, out Vector3 slopeForward, out Vector3 normal);
+                position.y = surface;
+                position += normal * (kart.transform.localScale.y * 0.5f + 0.05f);
+
+                kart.transform.SetPositionAndRotation(position, Quaternion.LookRotation(slopeForward, normal));
             }
         }
 

@@ -47,7 +47,9 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ One image
 ✓ One text description
 ✓ One generated world, shared by both players
-✓ One simple loop track
+✓ One simple loop track, with seed-derived hills and one drop scaled by
+  `track.difficulty` (road on embankments; objects rest on the local
+  ground height — `GeneratedTrack.GroundHeightAt`)
 ✓ Two local players, same keyboard
 ✓ Split-screen (top/bottom)
 ✓ Keyboard controls (no controller support yet)
@@ -78,6 +80,8 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   fails). By default the Generating screen waits for the meshes, with a
   timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
   turn it off to race immediately while they stream in
+✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
+  reshuffled on the racing line each world generation
 ✓ Cel-shaded look on everything (placeholders, track, karts, generated
   meshes), with the shadow band and rim light driven by the recipe palette
   (`GameConfig.toonShading`, `Assets/Scripts/Rendering/ToonStyle.cs` — see
@@ -87,7 +91,7 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
-✗ Obstacles, items, weapons, hazards, powerups, boosts
+✗ Items, weapons, hazards, powerups (beyond the pass-through track obstacles)
 ✗ Multiple track templates, branching tracks, jumps
 ✗ Complex procedural terrain
 ✗ Asset retrieval / asset-pack lookup for *specific* objects (photo/text

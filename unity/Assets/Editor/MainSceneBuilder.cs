@@ -98,6 +98,9 @@ namespace MarioKart.EditorTools
             var checkpoints = new GameObject("Checkpoints");
             checkpoints.transform.SetParent(worldGenerator.transform);
 
+            var obstacles = new GameObject("Obstacles", typeof(ObstacleGenerator));
+            obstacles.transform.SetParent(worldGenerator.transform);
+
             var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
             ground.transform.SetParent(worldGenerator.transform);
@@ -139,6 +142,7 @@ namespace MarioKart.EditorTools
             Set(worldGenerator, "environmentGenerator", environmentGenerator);
             Set(worldGenerator, "trackVisualRoot", trackVisual.transform);
             Set(worldGenerator, "checkpointRoot", checkpoints.transform);
+            Set(worldGenerator, "obstacleRoot", obstacles.transform);
             Set(worldGenerator, "sunLight", sun);
             Set(worldGenerator, "groundRenderer", groundRenderer);
 
@@ -491,14 +495,12 @@ namespace MarioKart.EditorTools
 
         private static ResultsUI BuildResultsPanel(Canvas canvas, Font font)
         {
-            var panel = CreatePanel(canvas.transform, "ResultsUI", dim: true, out var holder);
-            CreateText(panel.transform, "Title", "Results", font, 64, Center, new Vector2(0f, 220f), new Vector2(800f, 90f), TextAnchor.MiddleCenter);
-            var body = CreateText(panel.transform, "ResultsText", "", font, 40, Center, new Vector2(0f, 40f), new Vector2(1000f, 220f), TextAnchor.MiddleCenter);
-            var again = CreateButton(panel.transform, "PlayAgainButton", "Play Again", font, new Vector2(0f, -180f), new Vector2(320f, 80f));
+            // No dim overlay: the banner stamps on top of the live race.
+            var panel = CreatePanel(canvas.transform, "ResultsUI", dim: false, out var holder);
+            var again = CreateButton(panel.transform, "PlayAgainButton", "PLAY AGAIN", font, new Vector2(0f, 0f), new Vector2(240f, 64f));
 
             var ui = holder.AddComponent<ResultsUI>();
             Set(ui, "panel", panel);
-            Set(ui, "resultsText", body);
             Set(ui, "playAgainButton", again);
             return ui;
         }

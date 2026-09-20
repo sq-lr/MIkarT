@@ -26,6 +26,8 @@ namespace MarioKart.Players
         public Color sparkColor = new Color(1f, 0.9f, 0.3f);
         public Color sparkFade = new Color(1f, 0.55f, 0.1f);
         public Color skidMarkColor = new Color(0.05f, 0.05f, 0.05f, 1f);
+        [Tooltip("Skid marks are laid down only at (or within this fraction of) top speed -- a flat-out effect, independent of collisions. Slow scrapes leave smoke but no rubber.")]
+        [Range(0f, 1f)] public float skidMarkSpeedFraction = 0.98f;
 
         // Rear wheel positions in the kart cube's local space.
         private static readonly Vector3[] RearWheelLocalPositions =
@@ -83,9 +85,13 @@ namespace MarioKart.Players
         private void Update()
         {
             bool skidding = kart.IsSkidding && Mathf.Abs(kart.ForwardSpeed) > 1f;
+            // Rubber goes down at top speed, whether or not the kart is
+            // sliding: a wall hit knocks 40% off the speed, so tying marks to
+            // the skid state would mean they never appear.
+            bool marking = kart.ForwardSpeed >= kart.maxSpeed * skidMarkSpeedFraction;
             foreach (var trail in skidMarks)
             {
-                trail.emitting = skidding;
+                trail.emitting = marking;
             }
 
             // Tyre smoke comes off both rear wheels while sliding -- not the

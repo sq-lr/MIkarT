@@ -49,8 +49,20 @@ namespace MarioKart.CameraSystem
         /// <summary>Where the camera wants to be for the target's current pose.</summary>
         public Vector3 DesiredPosition => target.position + target.rotation * offset;
 
-        /// <summary>Kart yaw (+ yawDegrees) and the configured pitch; roll is always zero.</summary>
-        public Quaternion DesiredRotation => Quaternion.Euler(pitchDegrees, target.eulerAngles.y + yawDegrees, 0f);
+        /// <summary>
+        /// Looks along the kart's forward (yaw *and* slope pitch, so the
+        /// camera tips with the road over hills), plus the configured
+        /// pitch/yaw offsets; roll is always zero.
+        /// </summary>
+        public Quaternion DesiredRotation
+        {
+            get
+            {
+                Vector3 forward = target.forward;
+                if (Vector3.Cross(forward, Vector3.up).sqrMagnitude < 1e-4f) forward = Vector3.forward; // vertical: no defined yaw
+                return Quaternion.LookRotation(forward, Vector3.up) * Quaternion.Euler(pitchDegrees, yawDegrees, 0f);
+            }
+        }
 
         /// <summary>Jump straight to the desired pose (no smoothing), e.g. at the start line.</summary>
         public void SnapToTarget()

@@ -40,6 +40,12 @@ namespace MarioKart.Players
         [Tooltip("Grip multiplier while skidding (after hitting a wall or the other kart). Lower = longer slide.")]
         [Range(0f, 1f)] public float skidGripFactor = 0.15f;
 
+        [Header("Ground")]
+        [Tooltip("How far below the kart's centre to look for the road, metres. Beyond this the kart counts as airborne.")]
+        public float groundProbeDistance = 1.2f;
+        [Tooltip("How quickly the kart tilts to follow a slope. Higher = snappier.")]
+        public float groundAlignSpeed = 12f;
+
         [Header("Spin control")]
         [Tooltip("How fast physics-induced spin (from walls / the other kart) is bled off, per second. Higher = stops sooner.")]
         public float spinDamping = 12f;
@@ -50,10 +56,27 @@ namespace MarioKart.Players
         private PhysicsMaterial frictionless;
         private float scrapingUntil; // Time.time until which the scrape cap applies
         private float skidUntil;     // Time.time until which grip is reduced
+        private float boostUntil;
+        private float boostMultiplier = 1f;
+        private float paralyzeUntil;
+        private float spinRemainingDeg;
+        private float spinRateDeg;
+        private float spinSign = 1f;
 
         public bool IsSkidding => Time.time < skidUntil;
+        public bool IsBoosting => Time.time < boostUntil;
+        public bool IsParalyzed => Time.time < paralyzeUntil;
+        public bool IsSpinning => spinRemainingDeg > 0f;
 
         public float ForwardSpeed { get; private set; }
+
+        /// <summary>Smoothed normal of the surface under the kart (world up when airborne).</summary>
+        public Vector3 GroundNormal { get; private set; } = Vector3.up;
+
+        /// <summary>False while the probe below the kart finds nothing (over a crest, off a drop).</summary>
+        public bool IsGrounded { get; private set; } = true;
+
+        private readonly RaycastHit[] groundHits = new RaycastHit[8];
 
         /// <summary>Current steering input in [-1, 1] (read by KartVisual to turn the front wheels).</summary>
         public float Steering => currentInput.steering;
@@ -83,6 +106,11 @@ namespace MarioKart.Players
             {
                 col.material = frictionless;
             }
+
+            if (GetComponent<KartVisual>() == null)
+            {
+                gameObject.AddComponent<KartVisual>();
+            }
         }
 
         private void OnDestroy()
@@ -102,6 +130,49 @@ namespace MarioKart.Players
         public void StartSkid(float seconds)
         {
             skidUntil = Mathf.Max(skidUntil, Time.time + seconds);
+        }
+
+        /// <summary>
+        /// Raise top speed for a while and kick current velocity toward the
+        /// new cap. Called by TrackObstacle (boost pickup).
+        /// </summary>
+        public void ApplyBoost(float seconds, float multiplier)
+        {
+            if (rb == null || rb.isKinematic) return;
+            boostUntil = Mathf.Max(boostUntil, Time.time + seconds);
+            boostMultiplier = Mathf.Max(boostMultiplier, multiplier);
+
+            Vector3 velocity = rb.linearVelocity;
+            float forwardSpeed = Vector3.Dot(velocity, transform.forward);
+            float target = maxSpeed * boostMultiplier;
+            if (forwardSpeed < target)
+            {
+                float add = Mathf.Min(target - forwardSpeed, maxSpeed * 0.45f);
+                rb.linearVelocity = velocity + transform.forward * add;
+            }
+        }
+
+        /// <summary>Freeze horizontal motion and ignore input. Called by TrackObstacle.</summary>
+        public void ApplyParalyze(float seconds)
+        {
+            if (rb == null || rb.isKinematic) return;
+            paralyzeUntil = Time.time + seconds;
+            rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+            rb.angularVelocity = Vector3.zero;
+            spinRemainingDeg = 0f;
+        }
+
+        /// <summary>
+        /// Yaw the kart through <paramref name="turns"/> full rotations
+        /// (sign = direction) while ignoring steering. Called by TrackObstacle.
+        /// </summary>
+        public void ApplySpin(float turns)
+        {
+            if (rb == null || rb.isKinematic) return;
+            spinSign = turns < 0f ? -1f : 1f;
+            spinRemainingDeg = Mathf.Abs(turns) * 360f;
+            float duration = Mathf.Lerp(0.35f, 0.85f, Mathf.InverseLerp(0.25f, 1.25f, Mathf.Abs(turns)));
+            spinRateDeg = spinRemainingDeg / Mathf.Max(0.2f, duration);
         }
 
         /// <summary>Called by TrackBarrier on first contact with a wall.</summary>
@@ -144,23 +215,54 @@ namespace MarioKart.Players
             }
 
             float dt = Time.fixedDeltaTime;
+
+            if (IsParalyzed)
+            {
+                rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+                rb.angularVelocity = Vector3.zero;
+                ForwardSpeed = 0f;
+                return;
+            }
+
+            if (!IsBoosting) boostMultiplier = 1f;
+
+            KartInput input = currentInput;
+            if (IsSpinning)
+            {
+                float step = Mathf.Min(spinRemainingDeg, spinRateDeg * dt);
+                spinRemainingDeg -= step;
+                rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, spinSign * step, 0f));
+                // Keep world-space velocity so the kart pirouettes instead of
+                // steering into a circle. Grip re-aligns after the spin ends.
+                ForwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+                return;
+            }
+
             Vector3 velocity = rb.linearVelocity;
-            Vector3 forward = transform.forward;
-            Vector3 right = transform.right;
+
+            // ---- Ground: the road has hills, so the driving frame follows
+            // the surface under the kart instead of the world's XZ plane ----
+            ProbeGround(dt);
+            Vector3 normal = GroundNormal;
+            Vector3 heading = Vector3.ProjectOnPlane(rb.rotation * Vector3.forward, Vector3.up).normalized;
+            if (heading.sqrMagnitude < 0.5f) heading = Vector3.forward; // pointing straight up/down: give up on this step's heading
+            Vector3 forward = Vector3.ProjectOnPlane(heading, normal).normalized;
+            Vector3 right = Vector3.Cross(normal, forward);
 
             float forwardSpeed = Vector3.Dot(velocity, forward);
             float lateralSpeed = Vector3.Dot(velocity, right);
 
             // ---- Longitudinal ----
-            float topSpeed = Time.time < scrapingUntil ? maxSpeed * barrierScrapeSpeedFactor : maxSpeed;
-            if (currentInput.throttle > 0f)
+            float boostedMax = maxSpeed * boostMultiplier;
+            float topSpeed = Time.time < scrapingUntil ? boostedMax * barrierScrapeSpeedFactor : boostedMax;
+            if (input.throttle > 0f)
             {
-                forwardSpeed = Mathf.MoveTowards(forwardSpeed, topSpeed * currentInput.throttle, acceleration * dt);
+                forwardSpeed = Mathf.MoveTowards(forwardSpeed, topSpeed * input.throttle, acceleration * dt);
             }
-            else if (currentInput.brake > 0f)
+            else if (input.brake > 0f)
             {
                 // Brake to a stop, then reverse.
-                float target = forwardSpeed > 0.05f ? 0f : -maxReverseSpeed * currentInput.brake;
+                float target = forwardSpeed > 0.05f ? 0f : -maxReverseSpeed * input.brake;
                 forwardSpeed = Mathf.MoveTowards(forwardSpeed, target, brakeForce * dt);
             }
             else
@@ -177,21 +279,54 @@ namespace MarioKart.Players
             rb.angularVelocity = spin;
 
             // ---- Steering: yaw rate scales with speed, flips in reverse ----
-            float speedFactor = Mathf.Clamp(forwardSpeed / maxSpeed, -1f, 1f);
-            float yaw = currentInput.steering * steerSpeed * speedFactor * dt;
+            float speedFactor = Mathf.Clamp(forwardSpeed / boostedMax, -1f, 1f);
+            float yaw = input.steering * steerSpeed * speedFactor * dt;
             if (Mathf.Abs(yaw) > 0f)
             {
-                rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, yaw, 0f));
-                forward = rb.rotation * Vector3.forward;
-                right = rb.rotation * Vector3.right;
+                heading = Quaternion.Euler(0f, yaw, 0f) * heading;
+                forward = Vector3.ProjectOnPlane(heading, normal).normalized;
+                right = Vector3.Cross(normal, forward);
             }
+            // Heading about the world's up axis, body tilted to the ground:
+            // on flat road this is exactly the old yaw-only rotation.
+            rb.MoveRotation(Quaternion.LookRotation(forward, normal));
 
             // ---- Lateral grip: bleed off sideways slide ----
             float effectiveGrip = IsSkidding ? grip * skidGripFactor : grip;
             lateralSpeed = Mathf.MoveTowards(lateralSpeed, 0f, effectiveGrip * Mathf.Abs(lateralSpeed) * dt + 0.5f * dt);
 
+            // Keep whatever gravity/contact put along the surface normal
+            // (pressing into a slope, or falling when airborne).
             ForwardSpeed = forwardSpeed;
-            rb.linearVelocity = forward * forwardSpeed + right * lateralSpeed + Vector3.up * velocity.y;
+            rb.linearVelocity = forward * forwardSpeed + right * lateralSpeed + normal * Vector3.Dot(velocity, normal);
+        }
+
+        /// <summary>
+        /// Look straight down from the kart's centre for the road (or the
+        /// ground plane) and ease GroundNormal toward what it finds; toward
+        /// world up when nothing is close enough (airborne over a crest).
+        /// Other karts are ignored so driving over one doesn't tilt us.
+        /// </summary>
+        private void ProbeGround(float dt)
+        {
+            Vector3 target = Vector3.up;
+            IsGrounded = false;
+
+            int count = Physics.RaycastNonAlloc(rb.position, Vector3.down, groundHits, groundProbeDistance, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                var hit = groundHits[i];
+                if (hit.rigidbody != null) continue; // ourselves or the other kart
+                if (hit.distance < nearest)
+                {
+                    nearest = hit.distance;
+                    target = hit.normal;
+                    IsGrounded = true;
+                }
+            }
+
+            GroundNormal = Vector3.Slerp(GroundNormal, target, 1f - Mathf.Exp(-groundAlignSpeed * dt));
         }
     }
 }

@@ -272,6 +272,8 @@ namespace MarioKart.AssetsSystem
                 copy.transform.position += groundOffset;
             }
 
+            GhibliLook.RestyleTree(copy);
+
             if (placeholderRenderer != null)
             {
                 placeholderRenderer.enabled = false;
