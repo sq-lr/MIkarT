@@ -39,8 +39,13 @@ such as 0.1-0.2 is fine there.
 oversized, at key points of the track.
     "roadside"   -- things that would line a path or road at regular \
 intervals (lamp posts, fences, stalls, vending machines, planters).
-    "background" -- large distant things that would form a skyline \
-(towers, monuments, distant structures).
+    "background" -- NOT a distant skyline: the game turns this into a \
+continuous, close, deliberately prominent wall of copies lining BOTH sides \
+of the entire track, overlapping itself, that the road cuts straight through \
+and that blocks the view almost immediately (mountains, cliffs, a dense \
+treeline, a city skyline pressed close). Only use it for something that \
+plausibly repeats as a wall running the whole way around the track, not a \
+one-off structure.
     "scattered"  -- everything else: casual clutter distributed in groups.
 
 Rules:

@@ -53,8 +53,12 @@ a temple, one big distinctive building). It is placed once or twice, oversized, 
 key points of the track.
       "roadside"   -- things that line a path or road at regular intervals (lamp \
 posts, fences, bollards, planters, palms along a promenade, market stalls).
-      "background" -- large distant things that form a skyline (mountains, cliffs, \
-skyscrapers, far-off buildings, wind turbines).
+      "background" -- NOT a distant skyline: the game turns this into a continuous, \
+close, deliberately prominent wall of copies lining BOTH sides of the entire \
+track, overlapping itself, that the road cuts straight through and that blocks \
+the view almost immediately (mountains, cliffs, a dense treeline, a city \
+skyline pressed close). Only use it for something that plausibly repeats as a \
+wall running the whole way around the track, not a one-off structure.
       "scattered"  -- everything else: natural or casual clutter distributed in \
 groups (rocks, bushes, trees, barrels, crates).
 

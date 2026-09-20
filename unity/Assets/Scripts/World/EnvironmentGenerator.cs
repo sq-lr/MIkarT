@@ -163,17 +163,41 @@ namespace MarioKart.World
                         // Same reasoning as the background wall: capping the
                         // swapped-in mesh to the placeholder's own footprint
                         // was silently shrinking a real, wide-but-short GLB
-                        // back down below landmarkMinHeight. Also applies to
+                        // back down below landmarkMinHeight. This bypass is
+                        // only safe for the grand copies below, placed with
+                        // landmarkDistance's clearance -- it must NOT reach
                         // this type's small landmarkFillerFraction scattered
-                        // copies below (one AssetDefinition per type), but
-                        // the cap is sized conservatively off landmarkDistance
-                        // so those can't reach the road either.
+                        // copies (placed with only nearBand/midBand's much
+                        // smaller clearance), or their real mesh could
+                        // balloon up to maxHorizontalExtent wide and spill
+                        // onto the road. Those get their own separate,
+                        // normally-capped AssetDefinition instead of sharing
+                        // this one.
                         definition.capMeshToFootprint = false;
                         definition.maxHorizontalExtent = landmarkDistance * 2f;
                         int beforeLandmarks = instances.Count;
                         landmarksPlaced += PlaceLandmarks(layout, rng, definition, landmarksPlaced, instances);
                         for (int i = beforeLandmarks; i < instances.Count; i++) landmarkInstances.Add(instances[i]);
-                        PlaceClusters(layout, rng, definition, Mathf.RoundToInt(fillerCount * landmarkFillerFraction), zones, instances);
+
+                        int landmarkFillerCount = Mathf.RoundToInt(fillerCount * landmarkFillerFraction);
+                        if (landmarkFillerCount > 0)
+                        {
+                            var fillerDefinition = new AssetDefinition
+                            {
+                                objectType = entry.type + "_landmark_filler",
+                                prefab = definition.prefab,
+                                fallbackPrimitive = definition.fallbackPrimitive,
+                                tintColor = definition.tintColor,
+                                defaultScale = definition.defaultScale,
+                                meshTaskId = definition.meshTaskId,
+                                // capMeshToFootprint/maxHorizontalExtent stay
+                                // at their safe defaults (true / -1) here.
+                            };
+                            var fillerInstances = new List<GameObject>();
+                            definitions.Add(fillerDefinition);
+                            placeholdersByType[fillerDefinition.objectType] = fillerInstances;
+                            PlaceClusters(layout, rng, fillerDefinition, landmarkFillerCount, zones, fillerInstances);
+                        }
                         break;
 
                     case Placement.Roadside:
@@ -547,7 +571,18 @@ namespace MarioKart.World
         private static float FootprintFor(AssetDefinition definition, float scaleMultiplier)
         {
             Vector3 scale = definition.defaultScale * scaleMultiplier;
-            return Mathf.Max(scale.x, scale.z) * 0.5f + 0.5f;
+            // The half-diagonal, not just the larger of the two local axes:
+            // PlaceClusters gives every scattered instance a fully random
+            // yaw (0-360deg), and a non-square footprint's true world-space
+            // AABB at an intermediate angle (worst case: a 45deg-ish
+            // rotation on a roughly square footprint) can exceed either
+            // local axis alone by up to ~41% -- Max(x,z) alone under-reserved
+            // clearance for however the object actually landed rotated,
+            // letting its corner clip the wall/road on an unlucky roll.
+            // Roadside's yaw is fixed (facing the road), so this is more
+            // conservative than strictly needed there, but never wrong.
+            float halfDiagonal = 0.5f * Mathf.Sqrt(scale.x * scale.x + scale.z * scale.z);
+            return halfDiagonal + 0.5f;
         }
 
         /// <summary>
@@ -626,9 +661,24 @@ namespace MarioKart.World
                 renderer.sharedMaterial = ToonStyle.Create(tint, outline: role != Role.Horizon, name: instance.name);
             }
 
-            // Decoration only: karts are kept on the road by the barriers.
+            // Roadside/scattered decoration keeps its (already-solid, from
+            // CreatePrimitive) collider as a safety net: if placement ever
+            // puts one on the track despite FootprintFor's clearance math,
+            // the kart is physically blocked by it instead of clipping
+            // through -- it lands on the exact same collision path as
+            // hitting the other kart (KartController.OnCollisionEnter
+            // already treats "anything solid that isn't a TrackBarrier"
+            // uniformly, so this needs no new gameplay code). The collider
+            // stays sized to the placeholder even after a real mesh swaps
+            // in, since PlaceOver only disables the placeholder's renderer,
+            // never destroys the GameObject. Landmark/background/horizon
+            // stay pass-through: they're allowed to be big and close by
+            // design, not meant to be hit.
             var collider = instance.GetComponent<Collider>();
-            if (collider != null) Destroy(collider);
+            if (collider != null && role != Role.Roadside && role != Role.Filler)
+            {
+                Destroy(collider);
+            }
 
             layout.Occupy(position, footprint);
             return instance;

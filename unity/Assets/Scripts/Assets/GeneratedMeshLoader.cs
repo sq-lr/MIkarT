@@ -307,7 +307,13 @@ namespace MarioKart.AssetsSystem
                 copy.transform.position += groundOffset;
             }
 
-            GhibliLook.RestyleTree(copy);
+            // No restyle call here: `copy` was instantiated from `template`,
+            // which ImportTemplate already ran through ToonStyle.Restyle --
+            // the same outlined shader everything else in the world uses
+            // (placeholders, karts, track). Restyling again with a different,
+            // non-outlined shader here would just overwrite that and make
+            // generated/retrieved meshes look inconsistent with the rest of
+            // the toon-shaded scene.
 
             if (placeholderRenderer != null)
             {
