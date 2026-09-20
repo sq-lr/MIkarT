@@ -119,3 +119,26 @@ def test_claude_suggest_demotes_all_landmarks_when_max_landmarks_zero():
 
     assert result.filler_assets[0].placement == "scattered"
     assert "LANDMARK" not in messages.calls[0]["system"]  # the max_landmarks=0 prompt variant has no landmark step
+
+
+def test_indoor_preset_hardcodes_background_filler_to_wall():
+    from app.api.generate_world import INDOOR_BACKGROUND_KEYWORD, _indoor_background
+    from app.services.filler_asset_service import FillerAsset
+
+    suggested = [
+        FillerAsset(keyword="mountain", density=0.5, placement="background"),
+        FillerAsset(keyword="pine_treeline", density=0.8, placement="background"),
+        FillerAsset(keyword="bush", density=0.4, placement="scattered"),
+        FillerAsset(keyword="lamp_post", density=0.3, placement="roadside"),
+    ]
+
+    result = _indoor_background(suggested)
+
+    backgrounds = [a for a in result if a.placement == "background"]
+    assert [a.keyword for a in backgrounds] == [INDOOR_BACKGROUND_KEYWORD]
+    assert backgrounds[0].density == 0.8  # densest of the replaced suggestions
+    assert [a.keyword for a in result if a.placement != "background"] == ["bush", "lamp_post"]
+
+    # No background suggested at all: the room still gets its wall.
+    only_wall = _indoor_background([])
+    assert [(a.keyword, a.placement, a.density) for a in only_wall] == [(INDOOR_BACKGROUND_KEYWORD, "background", 0.6)]

@@ -87,6 +87,9 @@ async def generate_world(
                 filler_candidates = []
                 ground_color = None
 
+        if sky == "indoor":
+            filler_candidates = _indoor_background(filler_candidates)
+
         # 2. Cut each detected object out of the source image -- skipped
         #    entirely when not personalizing, since nothing will be submitted
         #    to Meshy for them anyway.
@@ -154,6 +157,23 @@ def _submit_mesh_tasks(
     text_tasks = [task for asset in text_assets if (task := submit_text(asset)) is not None]
 
     return image_tasks, text_tasks
+
+
+INDOOR_BACKGROUND_KEYWORD = "wall"
+
+
+def _indoor_background(filler_assets: list[FillerAsset]) -> list[FillerAsset]:
+    """For the "indoor" sky preset, the continuous background wall along the
+    track (EnvironmentGenerator.PlaceBackgroundWall) is hardcoded to library
+    "wall" pieces: whatever the filler extractor suggested for the horizon
+    (mountains, a treeline) would look wrong inside a room. Every background
+    keyword collapses into one "wall" entry at the densest of their densities
+    (0.6 if there were none), keeping every other placement as suggested.
+    """
+    backgrounds = [a for a in filler_assets if a.placement == "background"]
+    density = max((a.density for a in backgrounds), default=0.6)
+    kept = [a for a in filler_assets if a.placement != "background"]
+    return kept + [FillerAsset(keyword=INDOOR_BACKGROUND_KEYWORD, density=density, placement="background")]
 
 
 def _submit_filler_assets(

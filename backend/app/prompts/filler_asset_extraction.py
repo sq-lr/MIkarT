@@ -84,7 +84,7 @@ that the road cuts straight through and that blocks the view almost \
 immediately. Based on the photo and the text, what should that wall \
 actually be made of? Common examples: "mountain", "cliff", "hill", \
 "pine_tree" (a dense treeline), "palm_tree" (a jungle wall), "building" (a \
-city skyline pressed close), "dune". Pick whichever single keyword best \
+city skyline pressed close), "dune", "wall". Pick whichever single keyword best \
 fits the scene's setting and give it a low density (0.1-0.2 -- the instance \
 count along the wall is fixed by the game itself, density barely matters \
 here).
