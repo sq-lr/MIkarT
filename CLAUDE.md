@@ -115,7 +115,14 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✗ Ground texture / skybox generation from text (deferred — see
   docs/decisions/0007-text-to-3d-key-assets.md)
 ✗ Persisting generated meshes across backend restarts
-✗ Polished UI, final VFX, production auth, cloud deployment
+✓ Comic-book Boot + Upload screens: halftone paper, inked panel frames, a
+  speech-bubble controls hint, onomatopoeia word bursts, a slam-in entrance
+  and hover wobble on every control -- all rasterised at runtime by
+  decorating the scene-baked uGUI hierarchy in `Awake` (`UI/ComicStyle.cs`,
+  see docs/decisions/0013-comic-lobby-ui.md). Generating / HUD / Results
+  keep their existing look
+
+✗ Final VFX, production auth, cloud deployment
 ✗ Webcam capture or drag-and-drop image upload (file-picker only, Editor-only for now — see docs/decisions/0003-image-picker-stub.md)
 ```
 

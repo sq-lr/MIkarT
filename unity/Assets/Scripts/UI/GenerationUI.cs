@@ -71,15 +71,6 @@ namespace MarioKart.UI
             }
         }
 
-        private void OnDestroy()
-        {
-            if (burstImage != null && burstImage.sprite != null)
-            {
-                Destroy(burstImage.sprite.texture);
-                Destroy(burstImage.sprite);
-            }
-        }
-
         private void OnEnable()
         {
             GameManager.Instance.OnStateChanged += HandleStateChanged;
@@ -198,8 +189,8 @@ namespace MarioKart.UI
                 float k = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, popDuration));
                 float settle = Mathf.Clamp01((elapsed - popDuration) / Mathf.Max(0.01f, hold - popDuration));
                 // Overshoot past full size, spring back, then ease down a touch.
-                float scale = Mathf.LerpUnclamped(0.15f, 1f, EaseOutBack(k, popOvershoot)) * Mathf.Lerp(1f, 0.88f, settle);
-                float tilt = Mathf.Lerp(lean * 2.5f, lean, EaseOutBack(k, 1.2f));
+                float scale = Mathf.LerpUnclamped(0.15f, 1f, ComicStyle.EaseOutBack(k, ComicStyle.BackStrength(popOvershoot))) * Mathf.Lerp(1f, 0.88f, settle);
+                float tilt = Mathf.Lerp(lean * 2.5f, lean, ComicStyle.EaseOutBack(k, 1.2f));
 
                 rect.localScale = Vector3.one * scale;
                 rect.localRotation = Quaternion.Euler(0f, 0f, tilt);
@@ -225,20 +216,11 @@ namespace MarioKart.UI
             if (burst != null) burst.gameObject.SetActive(false);
         }
 
-        /// <summary>Back-easing: shoots past 1 by an amount set by <paramref name="overshoot"/> and springs back.</summary>
-        private static float EaseOutBack(float t, float overshoot)
-        {
-            float c1 = (overshoot - 1f) * 3.5f + 1.7f;
-            float c3 = c1 + 1f;
-            t -= 1f;
-            return 1f + c3 * t * t * t + c1 * t * t;
-        }
-
         /// <summary>
         /// A flat comic starburst Image behind the status text (inserted
         /// just before it so the text draws on top), hidden until the
-        /// countdown. Built in code like the particle shapes in
-        /// KartParticles, so the scene needs no sprite asset.
+        /// countdown. The sprite is ComicStyle's shared, code-built burst,
+        /// so the scene needs no sprite asset.
         /// </summary>
         private RectTransform CreateBurst(Transform parent, int siblingIndex)
         {
@@ -247,8 +229,7 @@ namespace MarioKart.UI
             go.transform.SetSiblingIndex(siblingIndex);
             burstImage = go.GetComponent<Image>();
             burstImage.raycastTarget = false;
-            var texture = BurstTexture(256, points: 14, innerRadius: 0.62f);
-            burstImage.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+            burstImage.sprite = ComicStyle.Burst(points: 14, innerRadius: 0.62f);
             burstImage.color = burstColor;
 
             var rect = go.GetComponent<RectTransform>();
@@ -257,33 +238,6 @@ namespace MarioKart.UI
             rect.sizeDelta = Vector2.one * 600f;
             go.SetActive(false);
             return rect;
-        }
-
-        /// <summary>Hard-edged spiky star polygon with a dark rim, alpha elsewhere.</summary>
-        private static Texture2D BurstTexture(int size, int points, float innerRadius)
-        {
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear };
-            var pixels = new Color32[size * size];
-            float half = size * 0.5f;
-            var fill = new Color32(255, 255, 255, 255);
-            var rim = new Color32(20, 20, 30, 255);
-            var clear = new Color32(0, 0, 0, 0);
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + 0.5f - half) / half, dy = (y + 0.5f - half) / half;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float angle = Mathf.Atan2(dy, dx);
-                    // Edge radius swings between the tips and the notches.
-                    float wave = 0.5f + 0.5f * Mathf.Cos(angle * points);
-                    float edge = Mathf.Lerp(innerRadius, 0.98f, Mathf.Pow(wave, 1.6f));
-                    pixels[y * size + x] = r > edge ? clear : r > edge - 0.045f ? rim : fill;
-                }
-            }
-            texture.SetPixels32(pixels);
-            texture.Apply(false, true);
-            return texture;
         }
     }
 }

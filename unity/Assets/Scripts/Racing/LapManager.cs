@@ -6,7 +6,9 @@ namespace MarioKart.Racing
     /// <summary>
     /// Tracks one player's progress around the loop. Checkpoints must be
     /// passed in order, so driving backward through the finish line does
-    /// not award a lap.
+    /// not award a lap. A lap is awarded on crossing checkpoint 0 (the
+    /// checkered stripe) after every other gate, not on the last gate
+    /// before it -- so the counter, chime and finish all fire on the line.
     /// </summary>
     public class LapManager : MonoBehaviour
     {
@@ -15,6 +17,7 @@ namespace MarioKart.Racing
         [SerializeField] private int totalLaps = 3;
 
         private int nextExpectedCheckpoint;
+        private bool startCrossed; // the grid sits just behind checkpoint 0; that first crossing is not a lap
         public int CurrentLap { get; private set; }
         public int TotalLaps => totalLaps;
         public bool Finished { get; private set; }
@@ -35,6 +38,7 @@ namespace MarioKart.Racing
         public void ResetProgress()
         {
             nextExpectedCheckpoint = 0;
+            startCrossed = false;
             CurrentLap = 0;
             Finished = false;
         }
@@ -45,8 +49,16 @@ namespace MarioKart.Racing
 
             nextExpectedCheckpoint = (nextExpectedCheckpoint + 1) % totalCheckpoints;
 
-            if (nextExpectedCheckpoint == 0)
+            if (checkpointIndex == 0)
             {
+                // Ordered passing means reaching the line again as the
+                // expected gate implies a full lap behind it.
+                if (!startCrossed)
+                {
+                    startCrossed = true;
+                    return;
+                }
+
                 CurrentLap++;
                 OnLapCompleted?.Invoke(CurrentLap);
 
