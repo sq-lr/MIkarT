@@ -338,7 +338,7 @@ namespace MarioKart.EditorTools
         private static LobbyUI BuildLobbyPanel(Canvas canvas, Font font)
         {
             var panel = CreatePanel(canvas.transform, "LobbyUI", dim: true, out var holder);
-            CreateText(panel.transform, "Title", "MARIO KART: AI WORLDS", font, 64, Center, new Vector2(0f, 120f), new Vector2(1200f, 100f), TextAnchor.MiddleCenter);
+            CreateText(panel.transform, "Title", "MIkarT", font, 64, Center, new Vector2(0f, 120f), new Vector2(1200f, 100f), TextAnchor.MiddleCenter);
             CreateText(panel.transform, "Hint", "P1: WASD    P2: Arrow keys", GameFonts.Body, 28, Center, new Vector2(0f, 40f), new Vector2(800f, 40f), TextAnchor.MiddleCenter);
             var start = CreateButton(panel.transform, "StartButton", "Start", font, new Vector2(0f, -60f), new Vector2(320f, 80f));
 

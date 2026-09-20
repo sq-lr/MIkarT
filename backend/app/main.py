@@ -9,7 +9,7 @@ load_dotenv()
 from app.api.assets import router as assets_router  # noqa: E402
 from app.api.generate_world import router as generate_world_router  # noqa: E402
 
-app = FastAPI(title="MarioKart World Generator", version="0.2.0")
+app = FastAPI(title="MIkarT World Generator", version="0.2.0")
 
 # Permissive CORS for local development: Unity's UnityWebRequest running in
 # the Editor/Player needs this to reach a locally-hosted backend.

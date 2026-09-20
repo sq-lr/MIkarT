@@ -105,6 +105,7 @@ namespace MarioKart.UI
                 ComicStyle.Stretch(title.rectTransform);
                 ComicStyle.RestyleLabel(title, 96, ComicStyle.Red);
                 title.alignment = TextAnchor.MiddleCenter;
+                title.text = "MIkarT"; // the scene bakes a title too; this keeps an old build of Main.unity current
             }
 
             var hintBubble = ComicStyle.AddSpeechBubble(root, "HintBubble", new Vector2(0f, -15f), new Vector2(700f, 100f), new Vector2(0.16f, 1f), 180f, ComicStyle.White);

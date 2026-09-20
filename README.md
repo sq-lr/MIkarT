@@ -1,4 +1,4 @@
-# ChromaKart *(placeholder name)*
+# MIkarT
 
 A local 2-player split-screen kart racer where one photo and one sentence
 generate the world you race in.
