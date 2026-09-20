@@ -29,7 +29,7 @@ namespace MarioKart.World
         private const float FinishPostRadius = 0.3f;
         private const float FinishBannerHeight = 1f;
 
-        public static void Build(Transform root, GeneratedTrack track, Color roadColor, Color wallColor)
+        public static void Build(Transform root, GeneratedTrack track, Color roadColor, Color wallColor, Color curbColor)
         {
             foreach (Transform child in root)
             {
@@ -49,6 +49,8 @@ namespace MarioKart.World
             float halfWidth = track.width * 0.5f;
 
             BuildRoad(root, centers, rights, halfWidth, roadColor);
+            BuildLanePaint(root, centers, rights, halfWidth);
+            BuildCurbs(root, centers, rights, halfWidth, curbColor);
             BuildWall(root, "Barrier_Left", centers, rights, -halfWidth, -1f, wallColor);
             BuildWall(root, "Barrier_Right", centers, rights, halfWidth, 1f, wallColor);
 
@@ -129,7 +131,7 @@ namespace MarioKart.World
             bannerRenderer.material.mainTextureScale = new Vector2(halfWidth * 2f / FinishCheckerSize / 2f, FinishBannerHeight / FinishCheckerSize / 2f);
         }
 
-        /// <summary>2×2 black/white checker, point-filtered and repeating.</summary>
+        /// <summary>2×2 cream/moss checker, point-filtered and repeating.</summary>
         private static Material CheckerMaterial()
         {
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false)
@@ -138,7 +140,9 @@ namespace MarioKart.World
                 wrapMode = TextureWrapMode.Repeat,
                 name = "Checker",
             };
-            tex.SetPixels(new[] { Color.white, Color.black, Color.black, Color.white });
+            var light = MarioKart.Rendering.GhibliLook.Cream;
+            var dark = new Color(0.38f, 0.42f, 0.34f);
+            tex.SetPixels(new[] { light, dark, dark, light });
             tex.Apply();
 
             return ToonStyle.Create(Color.white, texture: tex, name: "Checker");
@@ -170,6 +174,88 @@ namespace MarioKart.World
             // (shadow acne) -- which shows up as a huge dark blot around the
             // camera that fades out at the shadow distance.
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        /// <summary>
+        /// Dashed center line + solid edge lines. Separate meshes so they
+        /// sit slightly above the asphalt without fighting its UVs.
+        /// </summary>
+        private static void BuildLanePaint(Transform root, List<Vector3> centers, Vector3[] rights, float halfWidth)
+        {
+            const float paintHeight = RoadHeight + 0.03f;
+            const float centerHalf = 0.16f;
+            const float edgeHalf = 0.14f;
+            const float edgeInset = 0.7f;
+            const int dashOn = 4;
+            const int dashOff = 4;
+            var paint = new Color(0.96f, 0.96f, 0.92f);
+
+            int n = centers.Count;
+            var dashes = new MeshBuilder();
+            var edges = new MeshBuilder();
+            Vector3 up = Vector3.up * paintHeight;
+            int cycle = dashOn + dashOff;
+
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                if ((i % cycle) < dashOn)
+                {
+                    Vector3 li = centers[i] - rights[i] * centerHalf + up;
+                    Vector3 ri = centers[i] + rights[i] * centerHalf + up;
+                    Vector3 lj = centers[j] - rights[j] * centerHalf + up;
+                    Vector3 rj = centers[j] + rights[j] * centerHalf + up;
+                    dashes.AddQuad(li, ri, rj, lj, Vector3.up);
+                }
+
+                float inset = halfWidth - edgeInset;
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    Vector3 ai = centers[i] + rights[i] * (side * (inset - edgeHalf)) + up;
+                    Vector3 bi = centers[i] + rights[i] * (side * (inset + edgeHalf)) + up;
+                    Vector3 aj = centers[j] + rights[j] * (side * (inset - edgeHalf)) + up;
+                    Vector3 bj = centers[j] + rights[j] * (side * (inset + edgeHalf)) + up;
+                    edges.AddQuad(ai, bi, bj, aj, Vector3.up);
+                }
+            }
+
+            CreateMeshObject(root, "CenterLine", dashes, paint, withCollider: false, outline: false).isStatic = true;
+            CreateMeshObject(root, "EdgeLines", edges, paint, withCollider: false, outline: false).isStatic = true;
+        }
+
+        /// <summary>Red/white (or palette) kerbs along each wall, Mario Kart style.</summary>
+        private static void BuildCurbs(Transform root, List<Vector3> centers, Vector3[] rights, float halfWidth, Color accent)
+        {
+            const float curbWidth = 0.55f;
+            const float curbHeight = 0.07f;
+            const int stripeSamples = 5;
+            var white = Color.white;
+
+            int n = centers.Count;
+            var a = new MeshBuilder();
+            var b = new MeshBuilder();
+
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                bool stripeA = (i / stripeSamples) % 2 == 0;
+                var dest = stripeA ? a : b;
+                Vector3 top = Vector3.up * curbHeight;
+
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float inner = halfWidth - curbWidth;
+                    float outer = halfWidth;
+                    Vector3 i0 = centers[i] + rights[i] * (side * inner);
+                    Vector3 i1 = centers[i] + rights[i] * (side * outer);
+                    Vector3 j0 = centers[j] + rights[j] * (side * inner);
+                    Vector3 j1 = centers[j] + rights[j] * (side * outer);
+                    dest.AddQuad(i0 + top, i1 + top, j1 + top, j0 + top, Vector3.up);
+                }
+            }
+
+            CreateMeshObject(root, "Curb_A", a, white, withCollider: false, outline: false).isStatic = true;
+            CreateMeshObject(root, "Curb_B", b, accent, withCollider: false, outline: false).isStatic = true;
         }
 
         /// <summary>
@@ -205,7 +291,7 @@ namespace MarioKart.World
             go.AddComponent<TrackBarrier>();
         }
 
-        private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider, bool outline)
+        private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider, bool outline = true)
         {
             // Vertices are in world space, so the object must sit at world
             // identity no matter how the root happens to be transformed.
@@ -230,7 +316,7 @@ namespace MarioKart.World
         /// Closed Catmull-Rom spline through the control points, so the road
         /// and walls curve instead of kinking at every control point.
         /// </summary>
-        private static List<Vector3> SmoothLoop(List<Vector3> points)
+        public static List<Vector3> SmoothLoop(List<Vector3> points)
         {
             int n = points.Count;
             var result = new List<Vector3>(n * SubdivisionsPerSegment);
