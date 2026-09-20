@@ -20,7 +20,7 @@ cp .env.example .env
 | Variable | Values | Notes |
 |---|---|---|
 | `AI_PROVIDER` | `mock` (default), `claude` | Vision: scene tags/colors + object bounding boxes. `claude` uses `claude-opus-5` via the `anthropic` SDK and needs `ANTHROPIC_API_KEY`. |
-| `MESH_PROVIDER` | `mock` (default), `meshy` | Mesh generation from object crops. `meshy` needs `MESHY_API_KEY`; `MESHY_MODEL_TYPE` (`lowpoly`) and `MESHY_SHOULD_TEXTURE` tune the request. |
+| `MESH_PROVIDER` | `mock` (default), `meshy` | Mesh generation from object crops. `meshy` needs `MESHY_API_KEY`; `MESHY_MODEL_TYPE` (`standard`), `MESHY_SHOULD_TEXTURE` and `MESHY_TARGET_POLYCOUNT` (`8000`) tune the request; the model is pinned to `meshy-7.1`. |
 | `MAX_OBJECTS_PER_WORLD` | int (default 4) | Cap on detected objects → Meshy tasks per world. |
 
 ## Run

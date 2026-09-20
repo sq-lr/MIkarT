@@ -64,6 +64,12 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
   turn it off to race immediately while they stream in
 ✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
   reshuffled on the racing line each world generation
+✓ Cel-shaded look on everything (placeholders, track, karts, generated
+  meshes), with the shadow band and rim light driven by the recipe palette
+  (`GameConfig.toonShading`, `Assets/Scripts/Rendering/ToonStyle.cs` — see
+  docs/decisions/0008-toon-shading.md); matching cartoon particle effects
+  (outlined hard-edged shapes, stepped colours, shrink-out) in
+  `Players/KartParticles.cs`
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
@@ -145,6 +151,9 @@ see `docs/development.md`), and ADRs under `docs/decisions/`.
   Editor; standalone builds use a bundled placeholder image.
 - The mesh task registry is in-memory: restarting the backend orphans any
   in-flight `task_id`s (Unity gets 404s and keeps placeholders).
+- The toon shaders (`Assets/Resources/Shaders/`) and `ToonStyle` have not
+  been compiled or run in the Editor yet; if a shader fails to compile,
+  everything falls back to `Standard` with one warning.
 - `GeneratedMeshLoader` / glTFast import has not been run in the Editor
   either; the Meshy and Claude clients have only been exercised against
   scripted fakes in `backend/tests/`.

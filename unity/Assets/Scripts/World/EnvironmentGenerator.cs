@@ -591,7 +591,9 @@ namespace MarioKart.World
                 Color tint = role == Role.Landmark
                     ? definition.tintColor
                     : JitterColor(definition.tintColor, hue, sat, val);
-                renderer.sharedMaterial = GhibliLook.Lit(tint);
+                // Horizon silhouettes stay soft-edged; everything nearer gets
+                // the outline.
+                renderer.sharedMaterial = ToonStyle.Create(tint, outline: role != Role.Horizon, name: instance.name);
             }
 
             // Decoration only: karts are kept on the road by the barriers.

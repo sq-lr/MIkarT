@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.World
@@ -105,7 +106,7 @@ namespace MarioKart.World
             strip.AddComponent<MeshRenderer>().sharedMaterial = checker;
 
             // Posts just inside each wall, banner across the top.
-            var postMaterial = MarioKart.Rendering.GhibliLook.Lit(MarioKart.Rendering.GhibliLook.FenceWood);
+            var postMaterial = ToonStyle.Create(Color.white, name: "FinishPost");
             float postInset = WallThickness + FinishPostRadius;
             for (int side = -1; side <= 1; side += 2)
             {
@@ -144,10 +145,7 @@ namespace MarioKart.World
             tex.SetPixels(new[] { light, dark, dark, light });
             tex.Apply();
 
-            var mat = MarioKart.Rendering.GhibliLook.Lit(Color.white);
-            mat.name = "Checker";
-            mat.mainTexture = tex;
-            return mat;
+            return ToonStyle.Create(Color.white, texture: tex, name: "Checker");
         }
 
         // ------------------------------------------------------------------
@@ -168,8 +166,14 @@ namespace MarioKart.World
                 builder.AddQuad(li, ri, rj, lj, Vector3.up);
             }
 
-            var go = CreateMeshObject(root, "Road", builder, color, withCollider: false);
+            // No outline: a flat ribbon has no silhouette worth drawing.
+            var go = CreateMeshObject(root, "Road", builder, color, withCollider: false, outline: false);
             go.isStatic = true;
+            // Receive only. A flat surface at ground level has nothing to
+            // cast onto, and letting it cast makes it shadow *itself*
+            // (shadow acne) -- which shows up as a huge dark blot around the
+            // camera that fades out at the shadow distance.
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         /// <summary>
@@ -282,12 +286,12 @@ namespace MarioKart.World
                 builder.AddQuad(innerI + top, outerI + top, outerJ + top, innerJ + top, Vector3.up);
             }
 
-            var go = CreateMeshObject(root, name, builder, color, withCollider: true);
+            var go = CreateMeshObject(root, name, builder, color, withCollider: true, outline: true);
             go.isStatic = true;
             go.AddComponent<TrackBarrier>();
         }
 
-        private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider)
+        private static GameObject CreateMeshObject(Transform root, string name, MeshBuilder builder, Color color, bool withCollider, bool outline)
         {
             // Vertices are in world space, so the object must sit at world
             // identity no matter how the root happens to be transformed.
@@ -299,7 +303,7 @@ namespace MarioKart.World
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
 
             var renderer = go.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = MarioKart.Rendering.GhibliLook.Lit(color);
+            renderer.sharedMaterial = ToonStyle.Create(color, outline, name: name);
 
             if (withCollider)
             {

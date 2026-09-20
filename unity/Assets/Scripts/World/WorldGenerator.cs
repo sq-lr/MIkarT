@@ -55,7 +55,17 @@ namespace MarioKart.World
             obstacles.Generate(track, recipe.seed);
 
             ApplyTheme(recipe);
-            ApplySky(recipe.world != null ? recipe.world.sky : "sunny");
+            ApplySky(recipe.world != null ? recipe.world.sky : "sunny", recipe.palette);
+            ToonStyle.ApplyPalette(recipe.palette, RenderSettings.ambientLight);
+
+            var config = MarioKart.Core.GameManager.Instance != null ? MarioKart.Core.GameManager.Instance.Config : null;
+            ToonStyle.ConfigureShadows(sunLight, config != null ? config.shadowDistance : 70f);
+            if (groundRenderer != null)
+            {
+                // Receive only, like the road (see TrackMeshBuilder.BuildRoad).
+                groundRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                ToonStyle.DisableRim(groundRenderer.material);
+            }
 
             OnWorldReady?.Invoke();
         }
@@ -256,10 +266,6 @@ namespace MarioKart.World
 
             EnsureClouds().Rebuild(CurrentTrack, recipe != null ? recipe.seed : 1);
             GhibliLook.EnsurePostOnCameras();
-            foreach (var kart in FindObjectsByType<KartController>(FindObjectsSortMode.None))
-            {
-                GhibliLook.RestyleTree(kart.gameObject);
-            }
         }
 
         private GhibliClouds EnsureClouds()
@@ -279,10 +285,10 @@ namespace MarioKart.World
 
         /// <summary>
         /// Sky preset chosen on the upload screen (recipe.world.sky). Tints
-        /// the Totoro watercolor skybox; sunny leaves ApplyTheme as-is.
-        /// Cameras stay on the skybox so the Ghibli horizon still reads.
+        /// the Totoro watercolor skybox and the toon shadow/rim; sunny leaves
+        /// ApplyTheme as-is. Cameras stay on the skybox so the horizon reads.
         /// </summary>
-        private void ApplySky(string sky)
+        private void ApplySky(string sky, List<string> palette)
         {
             Color skyTop;
             Color skyHorizon;
@@ -324,6 +330,7 @@ namespace MarioKart.World
             }
 
             RenderSettings.ambientLight = ambient;
+            ToonStyle.ApplyPalette(palette, ambient);
             if (skyboxMaterial != null)
             {
                 if (skyboxMaterial.HasProperty("_SkyTop")) skyboxMaterial.SetColor("_SkyTop", skyTop);

@@ -29,5 +29,21 @@ namespace MarioKart.Core
         // that finishes later still swaps in -- the game never gets stuck.
         public bool waitForGeneratedMeshes = true;
         public float meshWaitTimeoutSeconds = 300f;
+
+        // Cel-shaded look (see docs/decisions/0008). Off = plain Standard
+        // shader on everything, including swapped-in generated meshes.
+        public bool toonShading = true;
+        // Comic-print halftone dots in the shadow bands: 0 = flat bands only,
+        // 1 = pure ink-on-paper dots. Cell size is in screen pixels.
+        public float toonDotStrength = 0.7f;
+        public float toonDotSizePixels = 6f;
+        // Faint static paper grain over each camera's frame (PaperGrainEffect).
+        // Strength is the +/- brightness swing (0.04 = 4%); 0 turns it off.
+        // Scale is screen pixels per grain texel: bigger = coarser paper.
+        public float paperGrainStrength = 0.04f;
+        public float paperGrainScalePixels = 1.5f;
+        // How far from the camera cast shadows are drawn. Smaller = sharper
+        // shadows near the karts; nothing beyond it casts one.
+        public float shadowDistance = 70f;
     }
 }
