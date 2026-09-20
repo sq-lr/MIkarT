@@ -18,20 +18,21 @@ namespace MarioKart.AI
                 seed = 1,
                 world = new WorldInfo
                 {
-                    name = "Generic Racing World",
-                    theme = "generic",
+                    name = "Kusakabe Countryside",
+                    theme = "countryside",
                     terrain = "grass",
-                    weather = "clear",
+                    weather = "haze",
                     time_of_day = "day",
                     sky = "sunny",
                 },
                 track = new TrackInfo { width = 16f, length = 600f, difficulty = 0.4f, surface = "concrete" },
                 objects = new List<WorldObjectEntry>
                 {
-                    new WorldObjectEntry { type = "tree", density = 0.3f, placement = "scattered" },
-                    new WorldObjectEntry { type = "rock", density = 0.15f, placement = "scattered" },
+                    new WorldObjectEntry { type = "tree", density = 0.45f, placement = "scattered" },
+                    new WorldObjectEntry { type = "bush", density = 0.22f, placement = "scattered" },
+                    new WorldObjectEntry { type = "rock", density = 0.12f, placement = "scattered" },
                 },
-                palette = new List<string> { "#4C6B3A", "#8C8C8C", "#6EC6FF" },
+                palette = new List<string> { "#F4E6C0", "#6B8F4A", "#A8C8DC" },
             };
         }
     }

@@ -12,7 +12,12 @@ namespace MarioKart.Core
     public class GameConfig
     {
         public string backendBaseUrl = "http://localhost:8000";
-        public float requestTimeoutSeconds = 15f;
+        // /generate-world now runs 3 concurrent Claude calls (vision, text,
+        // filler) plus sequential Meshy/Poly Pizza submissions for whatever
+        // they find -- realistically 15-20s+ with all real providers on, so
+        // 15s was cutting it close enough to trip the offline fallback on a
+        // slow request rather than a real failure.
+        public float requestTimeoutSeconds = 60f;
         public int defaultLapCount = 3;
         public float countdownSeconds = 3f;
         public bool fallbackToDefaultOnError = true;

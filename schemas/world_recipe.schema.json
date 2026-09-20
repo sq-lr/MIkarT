@@ -123,7 +123,7 @@
               },
               "provider": {
                 "type": "string",
-                "enum": ["meshy"]
+                "enum": ["meshy", "polypizza"]
               }
             }
           }

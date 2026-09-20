@@ -9,8 +9,9 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Response
 
-from app.services.mesh_generation_service import MeshTaskStatus
-from app.services.providers import get_providers
+from app.services.mesh_generation_service import MeshGenerationService, MeshTaskStatus
+from app.services.library_asset_service import LibraryAssetService
+from app.services.providers import Providers, get_providers
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +20,25 @@ router = APIRouter(prefix="/assets")
 GLB_MEDIA_TYPE = "model/gltf-binary"
 
 
+def _service_for(providers: Providers, task_id: str) -> MeshGenerationService | LibraryAssetService | None:
+    """Both Meshy tasks and Poly Pizza tasks share one task_id namespace (the
+    registry), but are backed by different services -- dispatch by whichever
+    provider actually registered this task."""
+    task = providers.registry.get(task_id)
+    if task is None:
+        return None
+    return providers.library if task.provider == "polypizza" else providers.mesh
+
+
 @router.get("/{task_id}", response_model=MeshTaskStatus, response_model_exclude_none=True)
 def get_asset_status(task_id: str) -> MeshTaskStatus:
     providers = get_providers()
-    if providers.registry.get(task_id) is None:
+    service = _service_for(providers, task_id)
+    if service is None:
         raise HTTPException(status_code=404, detail="unknown asset task")
 
     try:
-        return providers.mesh.get_status(task_id)
+        return service.get_status(task_id)
     except Exception:
         # A transient provider error shouldn't be reported as a permanent
         # failure -- Unity will simply poll again.
@@ -37,11 +49,12 @@ def get_asset_status(task_id: str) -> MeshTaskStatus:
 @router.get("/{task_id}/model.glb")
 def get_asset_model(task_id: str) -> Response:
     providers = get_providers()
-    if providers.registry.get(task_id) is None:
+    service = _service_for(providers, task_id)
+    if service is None:
         raise HTTPException(status_code=404, detail="unknown asset task")
 
     try:
-        glb = providers.mesh.fetch_model(task_id)
+        glb = service.fetch_model(task_id)
     except Exception:
         logger.exception("asset download failed for %s", task_id)
         raise HTTPException(status_code=502, detail="asset download failed")

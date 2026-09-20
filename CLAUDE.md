@@ -22,8 +22,10 @@ AI backend (FastAPI, mock by default)
   VLM (Claude vision)      → scene info + object bounding boxes
   ObjectCropper            → one image crop per object
   Text-asset extraction    → key props named in the description (Claude)
+  Filler-asset suggestion  → generic search keywords to diversify (Claude)
   Meshy Image-to-3D        → one async mesh task per crop
   Meshy Text-to-3D         → one async mesh task per extracted text asset
+  Poly Pizza search        → one library lookup per filler keyword
         ↓
 WorldRecipe (versioned JSON contract — schemas/world_recipe.schema.json)
   objects[].type = VLM label or text-extracted label, objects[].placement =
@@ -59,11 +61,17 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ Text-based key-asset extraction (Claude, text-only) for props named in the
   description but not necessarily in the photo, + Meshy text-to-3D meshes
   for them — see docs/decisions/0007-text-to-3d-key-assets.md
+✓ Generic filler-asset suggestion (Claude, photo+text) + retrieval from a
+  public asset library (Poly Pizza) to diversify and fill out the world
+  cheaply, for scattered/roadside/background objects only — see
+  docs/decisions/0009-generic-filler-from-poly-pizza.md
 ✓ Async mesh delivery: the world is built on primitive placeholders and
   generated meshes swap in when ready (placeholders stay if generation
   fails). By default the Generating screen waits for the meshes, with a
   timeout (`GameConfig.waitForGeneratedMeshes` / `meshWaitTimeoutSeconds`);
   turn it off to race immediately while they stream in
+✓ Pass-through track obstacles (boost, 0.5s paralyze, short spin),
+  reshuffled on the racing line each world generation
 ✓ Cel-shaded look on everything (placeholders, track, karts, generated
   meshes), with the shadow band and rim light driven by the recipe palette
   (`GameConfig.toonShading`, `Assets/Scripts/Rendering/ToonStyle.cs` — see
@@ -73,10 +81,12 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 
 ✗ Two separate player prompts / per-player world inputs
 ✗ Network / online multiplayer, matchmaking
-✗ Obstacles, items, weapons, hazards, powerups, boosts
+✗ Items, weapons, hazards, powerups (beyond the pass-through track obstacles)
 ✗ Multiple track templates, branching tracks, jumps
 ✗ Complex procedural terrain
-✗ Asset retrieval / asset-pack lookup (replaced by mesh generation)
+✗ Asset retrieval / asset-pack lookup for *specific* objects (photo/text
+  objects are still always generated, never looked up) — retrieval is used
+  only for generic filler, see docs/decisions/0009-generic-filler-from-poly-pizza.md
 ✗ Real LLM-based world synthesis (theme/palette/track are still a
   deterministic mock; only vision, text-asset extraction, and mesh
   generation are real vendors)
@@ -91,7 +101,7 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 
 | Owner | Directories |
 |---|---|
-| Person A — AI / backend / WorldRecipe | `backend/**` (vision, text-asset extraction, cropper, Meshy client, `/generate-world`, `/assets`), `schemas/**`, `unity/Assets/Scripts/AI/**` (incl. `MeshAssetClient.cs`) |
+| Person A — AI / backend / WorldRecipe | `backend/**` (vision, text-asset extraction, filler-asset suggestion, cropper, Meshy client, Poly Pizza client, `/generate-world`, `/assets`), `schemas/**`, `unity/Assets/Scripts/AI/**` (incl. `MeshAssetClient.cs`) |
 | Person B — Unity gameplay / track / racing | `unity/Assets/Scripts/Core/**`, `Players/**`, `Racing/**`, `World/TrackGenerator.cs`, `World/WorldGenerator.cs` |
 | Person C — assets / generated meshes / environment | `unity/Assets/Scripts/Assets/**` (namespace `MarioKart.AssetsSystem`, incl. `GeneratedMeshLoader.cs`), `World/EnvironmentGenerator.cs` |
 | Person D — UI / upload flow / QA | `unity/Assets/Scripts/UI/**`, `Input/**`, manual playtesting |
@@ -104,8 +114,8 @@ at minimum) — see `docs/development.md`'s conventions section.
 
 1. **AI generates structured data (and meshes). Unity generates the game.**
    The AI backend never touches a Unity object; Unity never calls an AI
-   model or the mesh provider directly — generated GLBs are proxied through
-   the backend.
+   model, the mesh provider, or the asset library directly — every GLB,
+   generated or retrieved, is proxied through the backend.
 2. **`WorldRecipe` is the backend/frontend contract.** It (plus the mesh
    bytes its `objects[].asset.task_id` handles point at) is the only thing
    that crosses that boundary — see `schemas/world_recipe.schema.json` and
@@ -115,9 +125,11 @@ at minimum) — see `docs/development.md`'s conventions section.
    system derives its randomness via `WorldRandom.DeriveSeed`, never
    `UnityEngine.Random`'s global state — see `docs/decisions/0004-seed-derivation.md`.
 4. **Unity only talks to the backend API** — `POST /generate-world`, then
-   `GET /assets/{task_id}` / `GET /assets/{task_id}/model.glb` for generated
-   meshes (see `docs/decisions/0006-meshy-async-mesh-generation.md`). No
-   other networking: this is a local, same-keyboard game.
+   `GET /assets/{task_id}` / `GET /assets/{task_id}/model.glb` for every
+   mesh, generated or retrieved (see
+   `docs/decisions/0006-meshy-async-mesh-generation.md` and
+   `docs/decisions/0009-generic-filler-from-poly-pizza.md`). No other
+   networking: this is a local, same-keyboard game.
 5. **Do not add gameplay features outside the current scope** (items,
    obstacles, multiple tracks, etc.) without team agreement — update this
    file's scope checklist when scope changes.

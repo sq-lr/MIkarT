@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from app.main import app
 from app.models.world_recipe import WorldRecipe
+from app.services.filler_asset_service import FillerAsset
 from app.services.mesh_generation_service import MeshTask
 from app.services.text_asset_service import ExtractedAsset
 from app.services.vision_service import DetectedObject, SceneUnderstanding
@@ -370,4 +371,117 @@ def test_synthesis_demotes_text_landmark_when_photo_already_has_two():
     assert placements["lighthouse"] == "landmark"
     assert placements["pier"] == "landmark"
     assert placements["dragon_statue"] == "scattered"  # demoted -- the cap of two is already used by the photo
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_appends_filler_assets_found_in_library():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="lantern", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.35)],
+    )
+    photo_tasks = [MeshTask(task_id="task-lantern", object_type="lantern", provider="meshy")]
+    filler_assets = [FillerAsset(keyword="traffic_cone", density=0.6, placement="roadside")]
+    filler_tasks = [MeshTask(task_id="poly-cone-1", object_type="traffic_cone", provider="polypizza")]
+
+    recipe = service.synthesize(scene, "beach", photo_tasks, [], [], filler_assets, filler_tasks)
+
+    assert [o.type for o in recipe.objects] == ["lantern", "traffic_cone"]
+    cone = recipe.objects[1]
+    assert cone.placement == "roadside"
+    assert cone.asset.task_id == "poly-cone-1" and cone.asset.provider == "polypizza"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_drops_filler_asset_with_no_library_match():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+    # No matching MeshTask -- the keyword search found nothing.
+    filler_assets = [FillerAsset(keyword="obscure_thing", density=0.5, placement="scattered")]
+
+    recipe = service.synthesize(scene, "beach", [], [], [], filler_assets, [])
+
+    assert "obscure_thing" not in [o.type for o in recipe.objects]
+
+
+def test_synthesis_filler_asset_collides_with_existing_object_is_skipped():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="rock", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.5)],
+    )
+    photo_tasks = [MeshTask(task_id="task-rock", object_type="rock", provider="meshy")]
+    filler_assets = [FillerAsset(keyword="rock", density=0.9, placement="scattered")]
+    filler_tasks = [MeshTask(task_id="poly-rock-1", object_type="rock", provider="polypizza")]
+
+    recipe = service.synthesize(scene, "beach", photo_tasks, [], [], filler_assets, filler_tasks)
+
+    # Only the photo-derived "rock" survives, with its own Meshy asset.
+    assert [o.type for o in recipe.objects] == ["rock"]
+    assert recipe.objects[0].asset.provider == "meshy"
+
+
+def test_synthesis_truncates_filler_before_photo_and_text():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[
+            DetectedObject(label=f"photo_{i}", bbox=[0.1, 0.1, 0.1, 0.1], prominence=0.5) for i in range(10)
+        ],
+    )
+    text_assets = [ExtractedAsset(label="text_0", prompt="p", density=0.2)]
+    filler_assets = [FillerAsset(keyword=f"filler_{i}", density=0.2, placement="scattered") for i in range(3)]
+    filler_tasks = [
+        MeshTask(task_id=f"poly-{i}", object_type=f"filler_{i}", provider="polypizza") for i in range(3)
+    ]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [], filler_assets, filler_tasks)
+
+    assert len(recipe.objects) == 12
+    # 10 photo + 1 text = 11 objects; only 1 of the 3 filler objects fits.
+    types = [o.type for o in recipe.objects]
+    assert types[:10] == [f"photo_{i}" for i in range(10)]
+    assert types[10] == "text_0"
+    assert types[11] == "filler_0"
+
+
+def test_synthesis_respects_configured_max_assets_below_schema_ceiling():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[
+            DetectedObject(label=f"photo_{i}", bbox=[0.1, 0.1, 0.1, 0.1], prominence=0.5) for i in range(5)
+        ],
+    )
+
+    recipe = service.synthesize(scene, "beach", [], [], [], [], [], max_assets=3)
+
+    assert len(recipe.objects) == 3
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_clamps_max_assets_to_schema_ceiling():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[
+            DetectedObject(label=f"photo_{i}", bbox=[0.1, 0.1, 0.1, 0.1], prominence=0.5) for i in range(20)
+        ],
+    )
+
+    # A misconfigured MAX_ASSETS_PER_WORLD above the schema's max_length=12
+    # must not produce an invalid recipe.
+    recipe = service.synthesize(scene, "beach", [], [], [], [], [], max_assets=50)
+
+    assert len(recipe.objects) == 12
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())

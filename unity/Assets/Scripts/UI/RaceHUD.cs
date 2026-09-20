@@ -1,4 +1,5 @@
 using MarioKart.Core;
+using MarioKart.Players;
 using MarioKart.Racing;
 using UnityEngine;
 using UnityEngine.UI;
@@ -42,12 +43,19 @@ namespace MarioKart.UI
 
             if (player1Laps != null && player1Text != null)
             {
-                player1Text.text = $"P1 Lap {player1Laps.CurrentLap}";
+                player1Text.text = FormatHud(player1Laps);
             }
             if (player2Laps != null && player2Text != null)
             {
-                player2Text.text = $"P2 Lap {player2Laps.CurrentLap}";
+                player2Text.text = FormatHud(player2Laps);
             }
+        }
+
+        private static string FormatHud(LapManager laps)
+        {
+            var kart = laps.GetComponent<KartController>();
+            float kmh = kart != null ? Mathf.Abs(kart.ForwardSpeed) * 3.6f : 0f;
+            return $"P{laps.playerIndex}   LAP {laps.CurrentLap}/{laps.TotalLaps}   {kmh:0}";
         }
     }
 }
