@@ -317,15 +317,56 @@ namespace MarioKart.EditorTools
 
             var choose = CreateButton(panel.transform, "ChooseImageButton", "Choose Image", font, new Vector2(0f, -110f), new Vector2(320f, 70f));
             var description = CreateInputField(panel.transform, "DescriptionField", "One sentence about the scene in the photo...", font, new Vector2(0f, -210f), new Vector2(900f, 70f));
+            CreateText(panel.transform, "SurfaceHint", "Track surface is selected from the uploaded image", font, 22, Center, new Vector2(0f, -285f), new Vector2(900f, 36f), TextAnchor.MiddleCenter);
+            var skyGroup = new GameObject("SkyOptions", typeof(RectTransform), typeof(ToggleGroup)).GetComponent<ToggleGroup>();
+            skyGroup.transform.SetParent(panel.transform, false);
+            SetRect(skyGroup.GetComponent<RectTransform>(), Center, new Vector2(0f, -350f), new Vector2(760f, 58f));
+            var sunny = CreateSkyToggle(skyGroup.transform, "Sunny", "Sunny Sky", font, new Vector2(-285f, 0f));
+            var cloudy = CreateSkyToggle(skyGroup.transform, "Cloudy", "Cloudy Sky", font, new Vector2(-95f, 0f));
+            var sunset = CreateSkyToggle(skyGroup.transform, "Sunset", "Sunset Sky", font, new Vector2(95f, 0f));
+            var night = CreateSkyToggle(skyGroup.transform, "Night", "Night Sky", font, new Vector2(285f, 0f));
             var generate = CreateButton(panel.transform, "GenerateButton", "Generate World", font, new Vector2(0f, -310f), new Vector2(320f, 80f));
+            generate.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -450f);
 
             var ui = holder.AddComponent<ImageUploadUI>();
             Set(ui, "panel", panel);
             Set(ui, "chooseImageButton", choose);
             Set(ui, "previewImage", preview);
             Set(ui, "descriptionField", description);
+            Set(ui, "sunnySkyToggle", sunny);
+            Set(ui, "cloudySkyToggle", cloudy);
+            Set(ui, "sunsetSkyToggle", sunset);
+            Set(ui, "nightSkyToggle", night);
+            Set(ui, "skyToggleGroup", skyGroup);
             Set(ui, "generateButton", generate);
             return ui;
+        }
+
+        private static Toggle CreateSkyToggle(Transform parent, string name, string label, Font font, Vector2 position)
+        {
+            var go = new GameObject(name, typeof(Image), typeof(Toggle));
+            go.transform.SetParent(parent, false);
+            SetRect(go.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), position, new Vector2(170f, 52f));
+
+            var background = go.GetComponent<Image>();
+            background.color = new Color(0.08f, 0.22f, 0.19f);
+            var toggle = go.GetComponent<Toggle>();
+            toggle.targetGraphic = background;
+            toggle.colors = new ColorBlock
+            {
+                normalColor = new Color(0.08f, 0.22f, 0.19f),
+                highlightedColor = new Color(0.22f, 0.48f, 0.36f),
+                pressedColor = new Color(0.15f, 0.38f, 0.28f),
+                selectedColor = new Color(0.55f, 0.72f, 0.20f),
+                disabledColor = Color.gray,
+                colorMultiplier = 1f,
+                fadeDuration = 0.1f,
+            };
+
+            var text = CreateText(go.transform, "Label", label, font, 22, Center, Vector2.zero, new Vector2(170f, 52f), TextAnchor.MiddleCenter);
+            text.color = Color.white;
+            Stretch(text.rectTransform);
+            return toggle;
         }
 
         private static GenerationUI BuildGeneratingPanel(Canvas canvas, Font font)
