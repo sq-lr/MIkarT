@@ -255,6 +255,26 @@ namespace MarioKart.World
                 skyboxMaterial = new Material(skyShader);
                 if (skyboxMaterial.HasProperty("_SkyTop")) skyboxMaterial.SetColor("_SkyTop", skyTop);
                 if (skyboxMaterial.HasProperty("_SkyHorizon")) skyboxMaterial.SetColor("_SkyHorizon", skyHorizon);
+                if (skyboxMaterial.HasProperty("_SkyUpperMid"))
+                {
+                    skyboxMaterial.SetColor("_SkyUpperMid", sky == "sunset"
+                        ? new Color(0.48f, 0.44f, 0.63f)
+                        : sky == "night"
+                            ? new Color(0.06f, 0.18f, 0.42f)
+                            : sky == "cloudy"
+                                ? new Color(0.24f, 0.52f, 0.72f)
+                                : new Color(0.17f, 0.58f, 0.78f));
+                }
+                if (skyboxMaterial.HasProperty("_SkyLowerMid"))
+                {
+                    skyboxMaterial.SetColor("_SkyLowerMid", sky == "sunset"
+                        ? new Color(0.82f, 0.48f, 0.44f)
+                        : sky == "night"
+                            ? new Color(0.10f, 0.30f, 0.58f)
+                            : sky == "cloudy"
+                                ? new Color(0.45f, 0.70f, 0.80f)
+                                : new Color(0.36f, 0.72f, 0.84f));
+                }
                 if (skyboxMaterial.HasProperty("_SkyGround")) skyboxMaterial.SetColor("_SkyGround", groundColor);
                 if (skyboxMaterial.HasProperty("_SkyTint")) skyboxMaterial.SetColor("_SkyTint", skyTop);
                 if (skyboxMaterial.HasProperty("_GroundColor")) skyboxMaterial.SetColor("_GroundColor", groundColor);
@@ -276,7 +296,7 @@ namespace MarioKart.World
                 groundRenderer.sharedMaterial = GhibliLook.Lit(groundColor);
             }
 
-            EnsureClouds().Rebuild(CurrentTrack, recipe != null ? recipe.seed : 1);
+            EnsureClouds().Rebuild(CurrentTrack, recipe != null ? recipe.seed : 1, recipe?.world?.sky ?? "sunny");
             GhibliLook.EnsurePostOnCameras();
         }
 
@@ -311,15 +331,15 @@ namespace MarioKart.World
             switch (sky)
             {
                 case "cloudy":
-                    skyTop = new Color(0.55f, 0.62f, 0.70f);
-                    skyHorizon = new Color(0.82f, 0.82f, 0.78f);
-                    ambient = new Color(0.55f, 0.60f, 0.58f);
+                    skyTop = new Color(0.42f, 0.62f, 0.78f);
+                    skyHorizon = new Color(0.72f, 0.80f, 0.78f);
+                    ambient = new Color(0.55f, 0.64f, 0.66f);
                     sunColor = new Color(0.85f, 0.86f, 0.88f);
                     sunIntensity = 0.7f;
                     break;
                 case "sunset":
-                    skyTop = new Color(0.55f, 0.42f, 0.62f);
-                    skyHorizon = new Color(0.98f, 0.72f, 0.48f);
+                    skyTop = new Color(0.23f, 0.35f, 0.55f);
+                    skyHorizon = new Color(1.0f, 0.85f, 0.54f);
                     ambient = new Color(0.72f, 0.42f, 0.32f);
                     sunColor = new Color(1f, 0.62f, 0.38f);
                     sunPitch = 12f;
@@ -334,11 +354,11 @@ namespace MarioKart.World
                     sunIntensity = 0.35f;
                     break;
                 default:
-                    skyTop = new Color(0.18f, 0.47f, 0.62f);
-                    skyHorizon = new Color(0.70f, 0.86f, 0.78f);
-                    ambient = new Color(0.48f, 0.62f, 0.58f);
-                    sunColor = new Color(0.82f, 0.88f, 0.84f);
-                    sunIntensity = 0.7f;
+                    skyTop = new Color(0.086f, 0.565f, 0.788f);
+                    skyHorizon = new Color(0.722f, 0.925f, 0.91f);
+                    ambient = new Color(0.68f, 0.78f, 0.78f);
+                    sunColor = new Color(1f, 0.97f, 0.78f);
+                    sunIntensity = 1.15f;
                     break;
             }
 
@@ -349,6 +369,34 @@ namespace MarioKart.World
                 if (skyboxMaterial.HasProperty("_SkyTop")) skyboxMaterial.SetColor("_SkyTop", skyTop);
                 if (skyboxMaterial.HasProperty("_SkyHorizon")) skyboxMaterial.SetColor("_SkyHorizon", skyHorizon);
                 if (skyboxMaterial.HasProperty("_SkyTint")) skyboxMaterial.SetColor("_SkyTint", skyTop);
+                if (skyboxMaterial.HasProperty("_SkyGround")) skyboxMaterial.SetColor("_SkyGround", GhibliLook.Moss);
+                if (skyboxMaterial.HasProperty("_SunColor")) skyboxMaterial.SetColor("_SunColor", sunColor);
+                if (skyboxMaterial.HasProperty("_SunSize")) skyboxMaterial.SetFloat("_SunSize", sky == "sunset" ? 0.11f : sky == "night" ? 0.01f : 0.035f);
+                if (skyboxMaterial.HasProperty("_SunDirection"))
+                {
+                    skyboxMaterial.SetVector("_SunDirection", sky == "sunset"
+                        ? new Vector4(0.15f, 0.12f, 0.95f, 0f)
+                        : new Vector4(0.25f, 0.72f, 0.65f, 0f));
+                }
+                if (skyboxMaterial.HasProperty("_MoonDirection"))
+                {
+                    skyboxMaterial.SetVector("_MoonDirection", new Vector4(-0.35f, 0.55f, 0.65f, 0f));
+                }
+                if (skyboxMaterial.HasProperty("_MoonColor")) skyboxMaterial.SetColor("_MoonColor", new Color(0.75f, 0.88f, 1f));
+                if (skyboxMaterial.HasProperty("_StarAmount")) skyboxMaterial.SetFloat("_StarAmount", sky == "night" ? 1f : 0f);
+                if (skyboxMaterial.HasProperty("_HorizonGlow"))
+                {
+                    skyboxMaterial.SetColor("_HorizonGlow", sky == "sunset"
+                        ? new Color(1f, 0.38f, 0.16f)
+                        : sky == "night"
+                            ? new Color(0.08f, 0.28f, 0.58f)
+                            : new Color(0.62f, 0.86f, 0.82f));
+                }
+                if (skyboxMaterial.HasProperty("_HorizonGlowAmount"))
+                {
+                    skyboxMaterial.SetFloat("_HorizonGlowAmount", sky == "night" ? 0.32f : sky == "sunset" ? 0.48f : 0.18f);
+                }
+                if (skyboxMaterial.HasProperty("_PainterlyBands")) skyboxMaterial.SetFloat("_PainterlyBands", 0.8f);
             }
             if (sunLight != null)
             {
