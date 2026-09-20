@@ -1,4 +1,5 @@
 using MarioKart.InputSystem;
+using MarioKart.World;
 using UnityEngine;
 
 namespace MarioKart.Players
@@ -101,6 +102,9 @@ namespace MarioKart.Players
         /// <summary>Raised when a paralyze or spin pickup takes effect. KartAudio plays the power-down sound.</summary>
         public event System.Action PowerDown;
 
+        /// <summary>Raised whenever any TrackObstacle takes effect, with which kind -- unlike PowerUp/PowerDown, distinguishes Paralyze from Spin. RaceHUD uses it to flash that player's screen border.</summary>
+        public event System.Action<ObstacleKind> ObstacleHit;
+
         private void Awake()
         {
             if (rb == null) rb = GetComponent<Rigidbody>();
@@ -171,6 +175,7 @@ namespace MarioKart.Players
                 rb.linearVelocity = velocity + transform.forward * add;
             }
             PowerUp?.Invoke();
+            ObstacleHit?.Invoke(ObstacleKind.Boost);
         }
 
         /// <summary>Freeze horizontal motion and ignore input. Called by TrackObstacle.</summary>
@@ -182,6 +187,7 @@ namespace MarioKart.Players
             rb.angularVelocity = Vector3.zero;
             spinRemainingDeg = 0f;
             PowerDown?.Invoke();
+            ObstacleHit?.Invoke(ObstacleKind.Paralyze);
         }
 
         /// <summary>
@@ -196,6 +202,7 @@ namespace MarioKart.Players
             float duration = Mathf.Lerp(0.35f, 0.85f, Mathf.InverseLerp(0.25f, 1.25f, Mathf.Abs(turns)));
             spinRateDeg = spinRemainingDeg / Mathf.Max(0.2f, duration);
             PowerDown?.Invoke();
+            ObstacleHit?.Invoke(ObstacleKind.Spin);
         }
 
         /// <summary>Called by TrackBarrier on first contact with a wall.</summary>

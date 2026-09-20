@@ -1,6 +1,7 @@
 using MarioKart.Core;
 using MarioKart.Players;
 using MarioKart.Racing;
+using MarioKart.World;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -37,6 +38,12 @@ namespace MarioKart.UI
         [Tooltip("Fill colour by how full the bar is: 0 = stopped, 1 = top speed.")]
         public Gradient fillGradient = DefaultGradient();
 
+        [Header("Obstacle flash")]
+        [Tooltip("Thickness in canvas units of the flashed border strip.")]
+        public float flashThickness = 18f;
+        [Tooltip("How fast the flash fades back to clear, in alpha per second.")]
+        public float flashFadeSpeed = 2.5f;
+
         private static readonly Color TrackColor = new Color(0.08f, 0.08f, 0.1f, 0.9f);
         private static readonly Color StunColor = new Color(0.45f, 0.47f, 0.52f);
 
@@ -49,7 +56,18 @@ namespace MarioKart.UI
             public float shown; // smoothed 0..1
         }
 
+        // A class, not a struct: TriggerFlash mutates it from an event
+        // callback registered once at Build time, so it needs a stable
+        // reference rather than a copy.
+        private class BorderFlash
+        {
+            public Image top, bottom, left, right;
+            public Color color = Color.white;
+            public float alpha;
+        }
+
         private SpeedBar p1Bar, p2Bar;
+        private BorderFlash p1Flash, p2Flash;
         private bool built;
 
         private void Awake()
@@ -91,6 +109,8 @@ namespace MarioKart.UI
 
             UpdateBar(ref p1Bar);
             UpdateBar(ref p2Bar);
+            UpdateFlash(p1Flash);
+            UpdateFlash(p2Flash);
         }
 
         private static string FormatHud(LapManager laps)
@@ -157,6 +177,91 @@ namespace MarioKart.UI
             // top half for P1, top-left of the bottom half for P2.
             p1Bar = BuildBar("P1SpeedBar", new Vector2(0f, 1f), player1Laps);
             p2Bar = BuildBar("P2SpeedBar", new Vector2(0f, 0.5f), player2Laps);
+
+            // Full-half border overlays, flashed by that player's own
+            // TrackObstacle hits (green boost, yellow spin, red paralyze).
+            p1Flash = BuildBorderFlash("P1Flash", new Vector2(0f, 0.5f), Vector2.one);
+            p2Flash = BuildBorderFlash("P2Flash", Vector2.zero, new Vector2(1f, 0.5f));
+            if (p1Bar.kart != null) p1Bar.kart.ObstacleHit += kind => TriggerFlash(p1Flash, kind);
+            if (p2Bar.kart != null) p2Bar.kart.ObstacleHit += kind => TriggerFlash(p2Flash, kind);
+        }
+
+        private BorderFlash BuildBorderFlash(string name, Vector2 anchorMin, Vector2 anchorMax)
+        {
+            var root = CreateRect(name, panel.transform);
+            root.anchorMin = anchorMin;
+            root.anchorMax = anchorMax;
+            root.offsetMin = root.offsetMax = Vector2.zero;
+
+            var flash = new BorderFlash();
+
+            flash.top = CreateImage("FlashTop", root, Color.clear);
+            flash.top.rectTransform.anchorMin = new Vector2(0f, 1f);
+            flash.top.rectTransform.anchorMax = Vector2.one;
+            flash.top.rectTransform.pivot = new Vector2(0.5f, 1f);
+            flash.top.rectTransform.offsetMin = Vector2.zero;
+            flash.top.rectTransform.offsetMax = Vector2.zero;
+            flash.top.rectTransform.sizeDelta = new Vector2(0f, flashThickness);
+            flash.top.rectTransform.anchoredPosition = Vector2.zero;
+
+            flash.bottom = CreateImage("FlashBottom", root, Color.clear);
+            flash.bottom.rectTransform.anchorMin = Vector2.zero;
+            flash.bottom.rectTransform.anchorMax = new Vector2(1f, 0f);
+            flash.bottom.rectTransform.pivot = new Vector2(0.5f, 0f);
+            flash.bottom.rectTransform.offsetMin = Vector2.zero;
+            flash.bottom.rectTransform.offsetMax = Vector2.zero;
+            flash.bottom.rectTransform.sizeDelta = new Vector2(0f, flashThickness);
+            flash.bottom.rectTransform.anchoredPosition = Vector2.zero;
+
+            flash.left = CreateImage("FlashLeft", root, Color.clear);
+            flash.left.rectTransform.anchorMin = Vector2.zero;
+            flash.left.rectTransform.anchorMax = new Vector2(0f, 1f);
+            flash.left.rectTransform.pivot = new Vector2(0f, 0.5f);
+            flash.left.rectTransform.offsetMin = Vector2.zero;
+            flash.left.rectTransform.offsetMax = Vector2.zero;
+            flash.left.rectTransform.sizeDelta = new Vector2(flashThickness, 0f);
+            flash.left.rectTransform.anchoredPosition = Vector2.zero;
+
+            flash.right = CreateImage("FlashRight", root, Color.clear);
+            flash.right.rectTransform.anchorMin = new Vector2(1f, 0f);
+            flash.right.rectTransform.anchorMax = Vector2.one;
+            flash.right.rectTransform.pivot = new Vector2(1f, 0.5f);
+            flash.right.rectTransform.offsetMin = Vector2.zero;
+            flash.right.rectTransform.offsetMax = Vector2.zero;
+            flash.right.rectTransform.sizeDelta = new Vector2(flashThickness, 0f);
+            flash.right.rectTransform.anchoredPosition = Vector2.zero;
+
+            return flash;
+        }
+
+        /// <summary>Green for a boost, yellow for a disorienting spin, red for the harsher paralyze stun.</summary>
+        private static Color ColorForObstacle(ObstacleKind kind)
+        {
+            switch (kind)
+            {
+                case ObstacleKind.Boost: return new Color(0.25f, 0.95f, 0.35f);
+                case ObstacleKind.Spin: return new Color(1f, 0.92f, 0.15f);
+                case ObstacleKind.Paralyze: return new Color(0.98f, 0.18f, 0.15f);
+                default: return Color.white;
+            }
+        }
+
+        private static void TriggerFlash(BorderFlash flash, ObstacleKind kind)
+        {
+            flash.color = ColorForObstacle(kind);
+            flash.alpha = 1f;
+        }
+
+        private void UpdateFlash(BorderFlash flash)
+        {
+            if (flash == null || flash.alpha <= 0f) return;
+            flash.alpha = Mathf.Max(0f, flash.alpha - flashFadeSpeed * Time.deltaTime);
+            Color c = flash.color;
+            c.a = flash.alpha;
+            flash.top.color = c;
+            flash.bottom.color = c;
+            flash.left.color = c;
+            flash.right.color = c;
         }
 
         private SpeedBar BuildBar(string name, Vector2 anchor, LapManager laps)
