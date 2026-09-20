@@ -365,10 +365,11 @@ namespace MarioKart.EditorTools
             var skyGroup = new GameObject("SkyOptions", typeof(RectTransform), typeof(ToggleGroup)).GetComponent<ToggleGroup>();
             skyGroup.transform.SetParent(panel.transform, false);
             SetRect(skyGroup.GetComponent<RectTransform>(), Center, new Vector2(0f, -350f), new Vector2(760f, 58f));
-            var sunny = CreateSkyToggle(skyGroup.transform, "Sunny", "Sunny Sky", font, new Vector2(-285f, 0f));
-            var cloudy = CreateSkyToggle(skyGroup.transform, "Cloudy", "Cloudy Sky", font, new Vector2(-95f, 0f));
-            var sunset = CreateSkyToggle(skyGroup.transform, "Sunset", "Sunset Sky", font, new Vector2(95f, 0f));
-            var night = CreateSkyToggle(skyGroup.transform, "Night", "Night Sky", font, new Vector2(285f, 0f));
+            var sunny = CreateSkyToggle(skyGroup.transform, "Sunny", "Sunny Sky", font, new Vector2(-300f, 0f));
+            var cloudy = CreateSkyToggle(skyGroup.transform, "Cloudy", "Cloudy Sky", font, new Vector2(-150f, 0f));
+            var sunset = CreateSkyToggle(skyGroup.transform, "Sunset", "Sunset Sky", font, new Vector2(0f, 0f));
+            var night = CreateSkyToggle(skyGroup.transform, "Night", "Night Sky", font, new Vector2(150f, 0f));
+            var indoor = CreateSkyToggle(skyGroup.transform, "Indoor", "Indoor", font, new Vector2(300f, 0f));
             var personalize = CreatePersonalizeToggle(panel.transform, font, new Vector2(0f, -410f));
             var generate = CreateButton(panel.transform, "GenerateButton", "Generate World", font, new Vector2(0f, -310f), new Vector2(320f, 80f));
             generate.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -470f);
@@ -382,6 +383,7 @@ namespace MarioKart.EditorTools
             Set(ui, "cloudySkyToggle", cloudy);
             Set(ui, "sunsetSkyToggle", sunset);
             Set(ui, "nightSkyToggle", night);
+            Set(ui, "indoorSkyToggle", indoor);
             Set(ui, "skyToggleGroup", skyGroup);
             Set(ui, "personalizeToggle", personalize);
             Set(ui, "generateButton", generate);

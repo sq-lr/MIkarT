@@ -35,7 +35,7 @@ namespace MarioKart.Rendering
             }
             radius += 40f;
 
-            int count = sky == "cloudy" ? 18 : sky == "sunset" ? 13 : sky == "night" ? 5 : DefaultCount;
+            int count = sky == "indoor" ? 0 : sky == "cloudy" ? 18 : sky == "sunset" ? 13 : sky == "night" ? 5 : DefaultCount;
             var highlightColor = sky == "sunset"
                 ? new Color(1f, 0.68f, 0.60f)
                 : sky == "night"

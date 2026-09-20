@@ -28,6 +28,9 @@ namespace MarioKart.UI
         [SerializeField] private Toggle cloudySkyToggle;
         [SerializeField] private Toggle sunsetSkyToggle;
         [SerializeField] private Toggle nightSkyToggle;
+        [SerializeField] private Toggle indoorSkyToggle;
+        // Five stamps side by side inside the 820 px form frame.
+        private const float StampWidth = 150f;
         [SerializeField] private ToggleGroup skyToggleGroup;
         [SerializeField] private Transform skyOptionsContainer;
         [SerializeField] private Toggle personalizeToggle;
@@ -55,12 +58,13 @@ namespace MarioKart.UI
             cloudySkyToggle.group = skyToggleGroup;
             sunsetSkyToggle.group = skyToggleGroup;
             nightSkyToggle.group = skyToggleGroup;
+            indoorSkyToggle.group = skyToggleGroup;
             sunnySkyToggle.isOn = true;
             // Off by default: fast/free retrieval-only world unless the
             // player explicitly opts into slower, personalized generation.
             personalizeToggle.isOn = false;
             generateButton.interactable = false;
-            foreach (var control in new Selectable[] { chooseImageButton, generateButton, sunnySkyToggle, cloudySkyToggle, sunsetSkyToggle, nightSkyToggle, personalizeToggle })
+            foreach (var control in new Selectable[] { chooseImageButton, generateButton, sunnySkyToggle, cloudySkyToggle, sunsetSkyToggle, nightSkyToggle, indoorSkyToggle, personalizeToggle })
             {
                 UISounds.Attach(control);
             }
@@ -105,6 +109,8 @@ namespace MarioKart.UI
             cloudySkyToggle = EnsureSkyToggle(cloudySkyToggle, "Cloudy", "Cloudy Sky");
             sunsetSkyToggle = EnsureSkyToggle(sunsetSkyToggle, "Sunset", "Sunset Sky");
             nightSkyToggle = EnsureSkyToggle(nightSkyToggle, "Night", "Night Sky");
+            // Scenes built before the indoor preset existed have no toggle wired for it.
+            indoorSkyToggle = EnsureSkyToggle(indoorSkyToggle, "Indoor", "Indoor");
         }
 
         private Toggle EnsureSkyToggle(Toggle toggle, string name, string label)
@@ -331,22 +337,24 @@ namespace MarioKart.UI
             }
             var stamps = new[]
             {
-                (sunnySkyToggle, "SUNNY", -300f, -3f, new Color(0.086f, 0.565f, 0.788f), new Color(0.722f, 0.925f, 0.91f)),
-                (cloudySkyToggle, "CLOUDY", -100f, 2f, new Color(0.42f, 0.62f, 0.78f), new Color(0.72f, 0.80f, 0.78f)),
-                (sunsetSkyToggle, "SUNSET", 100f, -2f, new Color(0.23f, 0.35f, 0.55f), new Color(1f, 0.85f, 0.54f)),
-                (nightSkyToggle, "NIGHT", 300f, 3f, new Color(0.18f, 0.24f, 0.42f), new Color(0.35f, 0.32f, 0.40f)),
+                (sunnySkyToggle, "SUNNY", -320f, -3f, new Color(0.086f, 0.565f, 0.788f), new Color(0.722f, 0.925f, 0.91f)),
+                (cloudySkyToggle, "CLOUDY", -160f, 2f, new Color(0.42f, 0.62f, 0.78f), new Color(0.72f, 0.80f, 0.78f)),
+                (sunsetSkyToggle, "SUNSET", 0f, -2f, new Color(0.23f, 0.35f, 0.55f), new Color(1f, 0.85f, 0.54f)),
+                (nightSkyToggle, "NIGHT", 160f, 3f, new Color(0.18f, 0.24f, 0.42f), new Color(0.35f, 0.32f, 0.40f)),
+                // Wall + floor tones rather than sky + horizon: the world is a room.
+                (indoorSkyToggle, "INDOOR", 320f, -2f, new Color(0.93f, 0.85f, 0.68f), new Color(0.55f, 0.38f, 0.26f)),
             };
             foreach (var (toggle, label, x, tilt, top, horizon) in stamps)
             {
                 if (toggle == null) continue;
                 var rect = toggle.GetComponent<RectTransform>();
                 if (skyGroup != null && rect.parent != skyGroup) rect.SetParent(skyGroup, false);
-                ComicStyle.Place(rect, new Vector2(x, 0f), new Vector2(180f, 104f));
+                ComicStyle.Place(rect, new Vector2(x, 0f), new Vector2(StampWidth, 104f));
                 var element = toggle.GetComponent<LayoutElement>();
                 if (skyGroup != null && skyGroup.GetComponent<HorizontalLayoutGroup>() != null)
                 {
                     if (element == null) element = toggle.gameObject.AddComponent<LayoutElement>();
-                    element.preferredWidth = 180f;
+                    element.preferredWidth = StampWidth;
                     element.preferredHeight = 104f;
                 }
                 ComicStyle.StyleSkyStamp(toggle, top, horizon, label, tilt);
@@ -451,6 +459,7 @@ namespace MarioKart.UI
             if (cloudySkyToggle.isOn) return "cloudy";
             if (sunsetSkyToggle.isOn) return "sunset";
             if (nightSkyToggle.isOn) return "night";
+            if (indoorSkyToggle.isOn) return "indoor";
             return "sunny";
         }
     }

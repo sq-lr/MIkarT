@@ -64,6 +64,11 @@ namespace MarioKart.World
             BuildTrackVisual(track, recipe.palette, recipe.track != null ? recipe.track.surface : "concrete");
             BuildCheckpoints(track);
 
+            // "indoor" boxes the track in with walls and a ceiling; any other
+            // preset must clear a room left by a previous generation.
+            if (IsIndoor(recipe)) IndoorRoomBuilder.Build(transform, track, recipe.palette);
+            else IndoorRoomBuilder.Remove(transform);
+
             if (environmentGenerator != null)
             {
                 environmentGenerator.Generate(recipe, track, envSeed);
@@ -201,7 +206,9 @@ namespace MarioKart.World
             ColorUtility.TryParseHtmlString(palette != null && palette.Count > 2 ? palette[2] : "#A8C8DC", out var accent);
             Debug.Log($"[WorldGenerator] ground_color = {groundColorHex}");
 
-            groundColor = Color.Lerp(groundColor, GhibliLook.Moss, 0.45f);
+            bool indoor = sky == "indoor";
+            // Indoors the ground reads as floorboards rather than a mossy field.
+            groundColor = Color.Lerp(groundColor, indoor ? IndoorRoomBuilder.Floor : GhibliLook.Moss, indoor ? 0.6f : 0.45f);
             sunColor = Color.Lerp(sunColor, new Color(1f, 0.93f, 0.75f), 0.45f);
 
             string tod = recipe?.world?.time_of_day?.ToLowerInvariant() ?? "day";
@@ -278,6 +285,22 @@ namespace MarioKart.World
                 skyHorizon = new Color(0.106f, 0.290f, 0.420f);
             }
 
+            if (indoor)
+            {
+                // Overhead ceiling lights, warm and even; the room is far
+                // smaller than the outdoor horizon so fog would only muddy
+                // the walls.
+                Color wallColor = IndoorRoomBuilder.WallColor(palette);
+                sunPitch = 62f;
+                sunIntensity = 1.0f;
+                sunColor = new Color(1f, 0.96f, 0.88f);
+                ambient = new Color(0.70f, 0.66f, 0.60f);
+                skyTop = IndoorRoomBuilder.Ceiling;
+                skyUpperMid = skyLowerMid = skyHorizon = wallColor;
+                fog = wallColor;
+                fogDensity = 0.0012f;
+            }
+
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = fog;
@@ -322,6 +345,11 @@ namespace MarioKart.World
 
             EnsureClouds().Rebuild(CurrentTrack, recipe != null ? recipe.seed : 1, recipe?.world?.sky ?? "sunny");
             GhibliLook.EnsurePostOnCameras();
+        }
+
+        private static bool IsIndoor(WorldRecipe recipe)
+        {
+            return string.Equals(recipe?.world?.sky, "indoor", StringComparison.OrdinalIgnoreCase);
         }
 
         private GhibliClouds EnsureClouds()
@@ -377,6 +405,16 @@ namespace MarioKart.World
                     sunPitch = 12f;
                     sunIntensity = 0.35f;
                     break;
+                case "indoor":
+                    // The skybox is hidden behind IndoorRoomBuilder's walls;
+                    // colour it like them so nothing blue leaks at the seams.
+                    skyTop = IndoorRoomBuilder.Ceiling;
+                    skyHorizon = IndoorRoomBuilder.WallColor(palette);
+                    ambient = new Color(0.70f, 0.66f, 0.60f);
+                    sunColor = new Color(1f, 0.96f, 0.88f);
+                    sunPitch = 62f;
+                    sunIntensity = 1.0f;
+                    break;
                 default:
                     skyTop = new Color(0.086f, 0.565f, 0.788f);
                     skyHorizon = new Color(0.722f, 0.925f, 0.91f);
@@ -393,9 +431,9 @@ namespace MarioKart.World
                 if (skyboxMaterial.HasProperty("_SkyTop")) skyboxMaterial.SetColor("_SkyTop", skyTop);
                 if (skyboxMaterial.HasProperty("_SkyHorizon")) skyboxMaterial.SetColor("_SkyHorizon", skyHorizon);
                 if (skyboxMaterial.HasProperty("_SkyTint")) skyboxMaterial.SetColor("_SkyTint", skyTop);
-                if (skyboxMaterial.HasProperty("_SkyGround")) skyboxMaterial.SetColor("_SkyGround", GhibliLook.Moss);
+                if (skyboxMaterial.HasProperty("_SkyGround")) skyboxMaterial.SetColor("_SkyGround", sky == "indoor" ? skyHorizon : GhibliLook.Moss);
                 if (skyboxMaterial.HasProperty("_SunColor")) skyboxMaterial.SetColor("_SunColor", sunColor);
-                if (skyboxMaterial.HasProperty("_SunSize")) skyboxMaterial.SetFloat("_SunSize", sky == "sunset" ? 0.11f : sky == "night" ? 0.01f : 0.035f);
+                if (skyboxMaterial.HasProperty("_SunSize")) skyboxMaterial.SetFloat("_SunSize", sky == "sunset" ? 0.11f : sky == "night" || sky == "indoor" ? 0.001f : 0.035f);
                 if (skyboxMaterial.HasProperty("_SunDirection"))
                 {
                     skyboxMaterial.SetVector("_SunDirection", sky == "sunset"
@@ -418,7 +456,7 @@ namespace MarioKart.World
                 }
                 if (skyboxMaterial.HasProperty("_HorizonGlowAmount"))
                 {
-                    skyboxMaterial.SetFloat("_HorizonGlowAmount", sky == "night" ? 0.32f : sky == "sunset" ? 0.48f : 0.18f);
+                    skyboxMaterial.SetFloat("_HorizonGlowAmount", sky == "indoor" ? 0f : sky == "night" ? 0.32f : sky == "sunset" ? 0.48f : 0.18f);
                 }
                 if (skyboxMaterial.HasProperty("_PainterlyBands")) skyboxMaterial.SetFloat("_PainterlyBands", 0.8f);
             }

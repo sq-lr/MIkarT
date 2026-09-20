@@ -181,6 +181,9 @@ def test_synthesis_preserves_selected_sky():
 
     assert recipe.world.sky == "sunset"
 
+    # "indoor" swaps the sky for a room in Unity; it is a plain preset here.
+    assert service.synthesize(scene, "make it a beach paradise", sky="indoor").world.sky == "indoor"
+
 
 def test_synthesis_ground_color_overrides_palette_ground_slot():
     service = MockWorldSynthesisService()

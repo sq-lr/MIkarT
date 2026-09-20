@@ -49,7 +49,7 @@
         "sky": {
           "description": "Selected race-sky presentation from the upload screen.",
           "type": "string",
-          "enum": ["sunny", "cloudy", "sunset", "night"],
+          "enum": ["sunny", "cloudy", "sunset", "night", "indoor"],
           "default": "sunny"
         },
         "mood": {

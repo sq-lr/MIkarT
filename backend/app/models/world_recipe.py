@@ -17,7 +17,7 @@ _HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
-_SKY_VALUES = {"sunny", "cloudy", "sunset", "night"}
+_SKY_VALUES = {"sunny", "cloudy", "sunset", "night", "indoor"}
 # Mirrors Mood in vision_service.py; Unity maps it to a soundtrack.
 _MOOD_VALUES = {"cheerful", "chill", "epic", "spooky", "energetic"}
 _TRACK_SURFACE_VALUES = {"concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"}

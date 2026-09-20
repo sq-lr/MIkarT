@@ -19,7 +19,7 @@ Canonical schema: [`../schemas/world_recipe.schema.json`](../schemas/world_recip
 | `world.terrain` | enum: `sand`, `grass`, `snow`, `dirt`, `rock`, `mud` | Drives ground material selection. |
 | `world.weather` | enum: `sunny`, `rainy`, `cloudy`, `snowy`, `clear` | Placeholder — not wired to any weather system yet. |
 | `world.time_of_day` | enum: `day`, `night`, `dusk`, `dawn` | Placeholder — not wired to any lighting rig yet beyond palette tinting. |
-| `world.sky` | enum: `sunny`, `cloudy`, `sunset`, `night` | Selected on the image-upload screen and applied to Unity camera backgrounds and ambient light. Defaults to `sunny` for older recipes. |
+| `world.sky` | enum: `sunny`, `cloudy`, `sunset`, `night`, `indoor` | Selected on the image-upload screen and applied to Unity camera backgrounds and ambient light. `indoor` replaces the sky and clouds with a room built around the track (walls, ceiling, light panels — `WorldGenerator.BuildIndoorRoom`) under flat indoor lighting. Defaults to `sunny` for older recipes. |
 | `track.width` | number, 4–20 | Meters. |
 | `track.length` | number, 100–2000 | Approximate loop length in meters; drives the loop radius in `TrackGenerator`. |
 | `track.difficulty` | number, 0–1 | Controls how much the loop's curvature is perturbed, and how much it climbs: `TrackGenerator` rolls the loop over three broad hills (±30 m) and one short, steeper drop (up to 12 m), both scaled by difficulty and capped at a 50% grade. 0 is a flat track. The road sits on embankments, and every environment object rests on the local road/embankment/plain height (`GeneratedTrack.GroundHeightAt`), so elevation never changes an object's x/z or its per-instance variation. |

@@ -16,12 +16,16 @@ namespace MarioKart.World
     {
         private const int Count = 12;
         private const float StartSkip = 0.1f;
-        // Stay inside the asphalt: walls sit at ±width/2, pickups have a
-        // ~0.55 m trigger, so leave that plus a little extra off each edge.
-        private const float EdgeClearance = 1.1f;
-        private const float Height = 0.7f;
-        private const float PickupScale = 0.9f;
-        private const float TriggerRadius = 0.55f;
+        // Big, readable signs: everything below scales with PickupScale so
+        // the trigger, hover height and edge clearance stay in proportion.
+        private const float PickupScale = 1.5f;
+        private const float TriggerRadius = 0.6f * PickupScale;
+        // Lifted enough that the STOP sign's post (0.55 below centre, scaled)
+        // stays clear of the road while the sign still sits at kart height.
+        private const float Height = 0.78f * PickupScale;
+        // Stay inside the asphalt: walls sit at ±width/2, so leave the
+        // trigger radius plus a little extra off each edge.
+        private const float EdgeClearance = TriggerRadius + 0.55f;
         private const float RespawnDelay = 0.45f;
         private const float MinRespawnDistance = 14f;
 
