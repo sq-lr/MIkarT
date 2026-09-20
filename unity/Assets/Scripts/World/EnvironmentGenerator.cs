@@ -237,7 +237,7 @@ namespace MarioKart.World
             {
                 float extra = rng.NextRange(fountainOffsetBand.x, fountainOffsetBand.y) + attempt * 1.1f;
                 Vector3 position = centre + outward * (layout.HalfWidth + WallThickness + extra);
-                position.y = 0f;
+                position.y = layout.GroundHeightAt(position);
                 if (!layout.IsFree(position, FountainFootprint)) continue;
 
                 float scale = rng.NextRange(0.85f, 1.25f);

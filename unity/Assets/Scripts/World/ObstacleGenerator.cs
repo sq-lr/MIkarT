@@ -171,7 +171,8 @@ namespace MarioKart.World
             float maxLateral = Mathf.Max(0.2f, track.width * 0.5f - EdgeClearance);
             float lateral = rng.NextRange(-maxLateral, maxLateral);
             Vector3 position = center + across * lateral;
-            position.y = Height;
+            // Hover above the road surface, which climbs with the hills.
+            position.y = track.RoadHeightAt(position) + Height;
             return new Pose(position, Quaternion.LookRotation(tangent, Vector3.up));
         }
 

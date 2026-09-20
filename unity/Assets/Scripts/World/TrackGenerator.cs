@@ -58,10 +58,48 @@ namespace MarioKart.World
             return t.sqrMagnitude > 0f ? t.normalized : Vector3.forward;
         }
 
+        /// <summary>
+        /// Closest point on the centreline polyline to `position`
+        /// (horizontally), with the centreline's height interpolated along
+        /// the segment -- the same linear interpolation the road ribbon is
+        /// built with, so anything derived from this sits exactly where the
+        /// road does. Snapping to the nearest *sample* instead is off by up
+        /// to half a sample of slope (metres on a steep hill).
+        /// </summary>
+        /// <returns>Perpendicular horizontal distance from the centreline.</returns>
+        public float ProjectOntoCentreline(Vector3 position, out float centreHeight)
+        {
+            var s = Samples;
+            int n = s.Count;
+            int i = NearestSample(position);
+            var p = new Vector2(position.x, position.z);
+
+            // The closest point lies on one of the two segments touching the
+            // nearest sample.
+            float best = float.MaxValue;
+            centreHeight = s[i].y;
+            for (int k = -1; k <= 0; k++)
+            {
+                Vector3 a = s[(i + k + n) % n];
+                Vector3 b = s[(i + k + 1) % n];
+                var a2 = new Vector2(a.x, a.z);
+                var ab = new Vector2(b.x, b.z) - a2;
+                float t = ab.sqrMagnitude > 1e-6f ? Mathf.Clamp01(Vector2.Dot(p - a2, ab) / ab.sqrMagnitude) : 0f;
+                float d = (p - (a2 + ab * t)).sqrMagnitude;
+                if (d < best)
+                {
+                    best = d;
+                    centreHeight = Mathf.Lerp(a.y, b.y, t);
+                }
+            }
+            return Mathf.Sqrt(best);
+        }
+
         /// <summary>Height of the driveable road surface nearest to `position`.</summary>
         public float RoadHeightAt(Vector3 position)
         {
-            return Samples[NearestSample(position)].y + TrackMeshBuilder.RoadHeight;
+            ProjectOntoCentreline(position, out float centreHeight);
+            return centreHeight + TrackMeshBuilder.RoadHeight;
         }
 
         /// <summary>
@@ -75,11 +113,9 @@ namespace MarioKart.World
         /// <summary>As above, also returning the horizontal distance from the road centreline.</summary>
         public float GroundHeightAt(Vector3 position, out float lateral)
         {
-            Vector3 centre = Samples[NearestSample(position)];
-            float dx = centre.x - position.x, dz = centre.z - position.z;
-            lateral = Mathf.Sqrt(dx * dx + dz * dz);
+            lateral = ProjectOntoCentreline(position, out float centreHeight);
             float edge = width * 0.5f + TrackMeshBuilder.WallThickness;
-            float height = lateral <= edge ? centre.y : centre.y - (lateral - edge) * ApronGrade;
+            float height = lateral <= edge ? centreHeight : centreHeight - (lateral - edge) * ApronGrade;
             return Mathf.Max(GroundLevel, height);
         }
 
@@ -107,7 +143,7 @@ namespace MarioKart.World
             Vector3 right = Vector3.Cross(Vector3.up, flat);
             normal = Vector3.Cross(forward, right).normalized; // road is flat across, so only the along-slope tilts it
             if (normal.y < 0f) normal = -normal;
-            return Samples[i].y + TrackMeshBuilder.RoadHeight;
+            return RoadHeightAt(position);
         }
     }
 
@@ -129,10 +165,10 @@ namespace MarioKart.World
         private const int ControlPointCount = 24;
         private const int CheckpointStride = 3; // 24 / 8 checkpoints
 
-        private const float MaxHillHeight = 18f;  // hill amplitude (m) at difficulty 1; the harmonics sum to ±this
-        private const float MaxDropHeight = 8f;   // metres lost over the drop at difficulty 1
+        private const float MaxHillHeight = 30f;  // hill amplitude (m) at difficulty 1; the harmonics sum to ±this
+        private const float MaxDropHeight = 12f;  // metres lost over the drop at difficulty 1
         private const float DropLengthSegments = 1.5f; // control-point segments the drop spans
-        private const float MaxGrade = 0.35f;     // rise / run, hills and drop each (arcade-steep)
+        private const float MaxGrade = 0.5f;      // rise / run (~27°), hills and drop each -- arcade-steep
         private static readonly float[] HarmonicWeights = { 0.5f, 0.3f, 0.2f };
 
         public GeneratedTrack Generate(WorldRecipe recipe, int seed)
@@ -193,7 +229,6 @@ namespace MarioKart.World
             int dropStart = rng.NextInt(3, n - 3);
 
             var heights = new float[n];
-            float min = float.MaxValue;
             for (int i = 0; i < n; i++)
             {
                 float theta = (i / (float)n) * Mathf.PI * 2f;
@@ -209,14 +244,27 @@ namespace MarioKart.World
                     : dropHeight * u;
 
                 heights[i] = y;
-                min = Mathf.Min(min, y);
             }
 
-            // The lowest point sits on the plain; everything else rises out of it.
             for (int i = 0; i < n; i++)
             {
                 var p = points[i];
-                p.y = heights[i] - min;
+                p.y = heights[i];
+                points[i] = p;
+            }
+
+            // The lowest point of the *smoothed* road sits on the plain and
+            // everything else rises out of it. Normalising on the control
+            // points is not enough: the Catmull-Rom spline overshoots between
+            // them, so a steep valley would dip below ground level, and the
+            // ground plane and terrain (clamped to GroundLevel) would then
+            // sit above the road there.
+            float min = float.MaxValue;
+            foreach (var s in TrackMeshBuilder.SmoothLoop(points)) min = Mathf.Min(min, s.y);
+            for (int i = 0; i < n; i++)
+            {
+                var p = points[i];
+                p.y -= min - GeneratedTrack.GroundLevel;
                 points[i] = p;
             }
         }
