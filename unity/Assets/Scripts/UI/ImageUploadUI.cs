@@ -56,6 +56,11 @@ namespace MarioKart.UI
                 optionsObject.transform.SetParent((panel != null ? panel : gameObject).transform, false);
                 skyOptionsContainer = optionsObject.transform;
 
+                var optionsRect = optionsObject.GetComponent<RectTransform>();
+                optionsRect.anchorMin = optionsRect.anchorMax = new Vector2(0.5f, 0.5f);
+                optionsRect.pivot = new Vector2(0.5f, 0.5f);
+                optionsRect.anchoredPosition = new Vector2(0f, -350f);
+                optionsRect.sizeDelta = new Vector2(760f, 58f);
                 var layout = optionsObject.GetComponent<HorizontalLayoutGroup>();
                 layout.spacing = 12f;
                 layout.childForceExpandWidth = false;
