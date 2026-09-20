@@ -68,7 +68,7 @@ names, so the builder logs an error naming the field if a script renames one.
 | ↳ `Backend` | `AI/WorldRecipeClient`, `AI/MeshAssetClient` | — |
 | `WorldGenerator` | `World/WorldGenerator` | `environmentGenerator`, `trackVisualRoot`, `checkpointRoot`, `sunLight`, `groundRenderer` |
 | ↳ `EnvironmentGenerator` | `World/EnvironmentGenerator` **and** `Assets/GeneratedMeshLoader` on the same GameObject (not a child — `Generate()` destroys children) | `meshLoader` → self; `GeneratedMeshLoader.client` → `MeshAssetClient` |
-| ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon and two `TrackBarrier` walls (mesh colliders) | — |
+| ↳ `TrackVisual` | empty; `TrackMeshBuilder` fills it at runtime with the road ribbon (mesh collider — it's what the karts drive on, since the road has hills), two `TrackBarrier` walls (mesh colliders), and a `Terrain` height-field mesh (sampled from `GeneratedTrack.GroundHeightAt`, sharing the ground plane's material) that forms the embankments under a raised road | — |
 | ↳ `Checkpoints` | empty; `WorldGenerator` fills it at runtime with trigger gates facing the track tangent | — |
 | ↳ `Ground` | Plane ×60 (600 m) at y = −0.05 | palette-tinted via `groundRenderer` |
 | `Directional Light` | `Light` | palette-tinted via `sunLight` |

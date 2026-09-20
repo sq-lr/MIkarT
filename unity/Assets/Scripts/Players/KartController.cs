@@ -40,6 +40,12 @@ namespace MarioKart.Players
         [Tooltip("Grip multiplier while skidding (after hitting a wall or the other kart). Lower = longer slide.")]
         [Range(0f, 1f)] public float skidGripFactor = 0.15f;
 
+        [Header("Ground")]
+        [Tooltip("How far below the kart's centre to look for the road, metres. Beyond this the kart counts as airborne.")]
+        public float groundProbeDistance = 1.2f;
+        [Tooltip("How quickly the kart tilts to follow a slope. Higher = snappier.")]
+        public float groundAlignSpeed = 12f;
+
         [Header("Spin control")]
         [Tooltip("How fast physics-induced spin (from walls / the other kart) is bled off, per second. Higher = stops sooner.")]
         public float spinDamping = 12f;
@@ -54,6 +60,14 @@ namespace MarioKart.Players
         public bool IsSkidding => Time.time < skidUntil;
 
         public float ForwardSpeed { get; private set; }
+
+        /// <summary>Smoothed normal of the surface under the kart (world up when airborne).</summary>
+        public Vector3 GroundNormal { get; private set; } = Vector3.up;
+
+        /// <summary>False while the probe below the kart finds nothing (over a crest, off a drop).</summary>
+        public bool IsGrounded { get; private set; } = true;
+
+        private readonly RaycastHit[] groundHits = new RaycastHit[8];
 
         /// <summary>Current steering input in [-1, 1] (read by KartVisual to turn the front wheels).</summary>
         public float Steering => currentInput.steering;
@@ -145,8 +159,15 @@ namespace MarioKart.Players
 
             float dt = Time.fixedDeltaTime;
             Vector3 velocity = rb.linearVelocity;
-            Vector3 forward = transform.forward;
-            Vector3 right = transform.right;
+
+            // ---- Ground: the road has hills, so the driving frame follows
+            // the surface under the kart instead of the world's XZ plane ----
+            ProbeGround(dt);
+            Vector3 normal = GroundNormal;
+            Vector3 heading = Vector3.ProjectOnPlane(rb.rotation * Vector3.forward, Vector3.up).normalized;
+            if (heading.sqrMagnitude < 0.5f) heading = Vector3.forward; // pointing straight up/down: give up on this step's heading
+            Vector3 forward = Vector3.ProjectOnPlane(heading, normal).normalized;
+            Vector3 right = Vector3.Cross(normal, forward);
 
             float forwardSpeed = Vector3.Dot(velocity, forward);
             float lateralSpeed = Vector3.Dot(velocity, right);
@@ -181,17 +202,50 @@ namespace MarioKart.Players
             float yaw = currentInput.steering * steerSpeed * speedFactor * dt;
             if (Mathf.Abs(yaw) > 0f)
             {
-                rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, yaw, 0f));
-                forward = rb.rotation * Vector3.forward;
-                right = rb.rotation * Vector3.right;
+                heading = Quaternion.Euler(0f, yaw, 0f) * heading;
+                forward = Vector3.ProjectOnPlane(heading, normal).normalized;
+                right = Vector3.Cross(normal, forward);
             }
+            // Heading about the world's up axis, body tilted to the ground:
+            // on flat road this is exactly the old yaw-only rotation.
+            rb.MoveRotation(Quaternion.LookRotation(forward, normal));
 
             // ---- Lateral grip: bleed off sideways slide ----
             float effectiveGrip = IsSkidding ? grip * skidGripFactor : grip;
             lateralSpeed = Mathf.MoveTowards(lateralSpeed, 0f, effectiveGrip * Mathf.Abs(lateralSpeed) * dt + 0.5f * dt);
 
+            // Keep whatever gravity/contact put along the surface normal
+            // (pressing into a slope, or falling when airborne).
             ForwardSpeed = forwardSpeed;
-            rb.linearVelocity = forward * forwardSpeed + right * lateralSpeed + Vector3.up * velocity.y;
+            rb.linearVelocity = forward * forwardSpeed + right * lateralSpeed + normal * Vector3.Dot(velocity, normal);
+        }
+
+        /// <summary>
+        /// Look straight down from the kart's centre for the road (or the
+        /// ground plane) and ease GroundNormal toward what it finds; toward
+        /// world up when nothing is close enough (airborne over a crest).
+        /// Other karts are ignored so driving over one doesn't tilt us.
+        /// </summary>
+        private void ProbeGround(float dt)
+        {
+            Vector3 target = Vector3.up;
+            IsGrounded = false;
+
+            int count = Physics.RaycastNonAlloc(rb.position, Vector3.down, groundHits, groundProbeDistance, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                var hit = groundHits[i];
+                if (hit.rigidbody != null) continue; // ourselves or the other kart
+                if (hit.distance < nearest)
+                {
+                    nearest = hit.distance;
+                    target = hit.normal;
+                    IsGrounded = true;
+                }
+            }
+
+            GroundNormal = Vector3.Slerp(GroundNormal, target, 1f - Mathf.Exp(-groundAlignSpeed * dt));
         }
     }
 }

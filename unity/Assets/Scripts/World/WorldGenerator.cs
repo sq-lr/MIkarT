@@ -78,7 +78,12 @@ namespace MarioKart.World
                 wallColor = Color.Lerp(wallColor, tint, 0.5f);
             }
 
-            TrackMeshBuilder.Build(trackVisualRoot, track, roadColor, wallColor);
+            // The terrain mesh shares the ground plane's material instance so
+            // the embankments are indistinguishable from the plain, and the
+            // palette tint ApplyPalette writes to it afterwards reaches both.
+            Material groundMaterial = groundRenderer != null ? groundRenderer.material : null;
+
+            TrackMeshBuilder.Build(trackVisualRoot, track, roadColor, wallColor, groundMaterial);
         }
 
         private void BuildCheckpoints(GeneratedTrack track)
@@ -100,9 +105,12 @@ namespace MarioKart.World
                 // where the track happens to run along the Z axis.
                 go.transform.rotation = Quaternion.LookRotation(TangentAt(track, i * (track.controlPoints.Count / track.checkpointPositions.Count)), Vector3.up);
 
+                // The control point sits on the road surface (which now has
+                // hills); the gate reaches 1 m below it and 5 m above.
                 var collider = go.AddComponent<BoxCollider>();
                 collider.isTrigger = true;
-                collider.size = new Vector3(track.width, 4f, 2f);
+                collider.size = new Vector3(track.width, 6f, 2f);
+                collider.center = new Vector3(0f, 2f, 0f);
 
                 var checkpoint = go.AddComponent<Checkpoint>();
                 checkpoint.checkpointIndex = i;

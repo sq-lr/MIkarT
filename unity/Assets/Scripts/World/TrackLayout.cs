@@ -26,6 +26,9 @@ namespace MarioKart.World
 
         public Vector3 Point(int index) => track.controlPoints[Wrap(index)];
 
+        /// <summary>Height an object at `position` rests on (road, embankment, or the plain) -- see GeneratedTrack.GroundHeightAt.</summary>
+        public float GroundHeightAt(Vector3 position) => track.GroundHeightAt(position);
+
         public Vector3 Tangent(int index) => WorldGenerator.TangentAt(track, Wrap(index));
 
         /// <summary>

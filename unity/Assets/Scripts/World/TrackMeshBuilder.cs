@@ -6,10 +6,13 @@ namespace MarioKart.World
 {
     /// <summary>
     /// Turns a GeneratedTrack (a coarse loop of control points) into the
-    /// physical track: a smooth road ribbon plus a solid barrier wall along
-    /// each edge. Purely geometric and deterministic -- no randomness, so it
-    /// needs no seed. The barrier walls carry a TrackBarrier so karts that
-    /// touch them are slowed (see KartController).
+    /// physical track: a smooth road ribbon (with a collider -- the road is
+    /// what the karts drive on now that it has hills), a solid barrier wall
+    /// along each edge, and an embankment sloping from each wall down to
+    /// the ground plane wherever the road is raised. Purely geometric and
+    /// deterministic -- no randomness, so it needs no seed. The barrier
+    /// walls carry a TrackBarrier so karts that touch them are slowed (see
+    /// KartController).
     /// </summary>
     public static class TrackMeshBuilder
     {
@@ -17,9 +20,15 @@ namespace MarioKart.World
         // points × 8 = 192 samples around the loop.
         private const int SubdivisionsPerSegment = 8;
 
-        private const float RoadHeight = 0.02f;   // just above the ground plane
+        public const float RoadHeight = 0.02f;    // road surface above the centreline
+        public const float WallThickness = 0.5f;
         private const float WallHeight = 1.2f;
-        private const float WallThickness = 0.5f;
+        // Terrain height-field (see BuildTerrain).
+        private const float TerrainCellSize = 2f;         // metres, minimum
+        private const int TerrainMaxCellsPerSide = 220;   // caps the vertex count for long loops
+        private const float TerrainMargin = 6f;           // flat skirt past the widest embankment
+        private const float UnderRoadDip = 0.4f;          // hidden beneath the road; avoids z-fighting it
+        private const float TerrainUvMetres = 8f;         // metres per UV tile if the ground material is textured
 
         // Finish line: checkered strip on the road at checkpoint 0, with a
         // post either side and a banner across the top.
@@ -29,15 +38,18 @@ namespace MarioKart.World
         private const float FinishPostRadius = 0.3f;
         private const float FinishBannerHeight = 1f;
 
-        public static void Build(Transform root, GeneratedTrack track, Color roadColor, Color wallColor)
+        /// <param name="groundMaterial">The ground plane's material, shared by the terrain mesh so the embankments blend into the plain (any later palette tint applies to both).</param>
+        public static void Build(Transform root, GeneratedTrack track, Color roadColor, Color wallColor, Material groundMaterial)
         {
             foreach (Transform child in root)
             {
                 Object.Destroy(child.gameObject);
             }
 
-            List<Vector3> centers = SmoothLoop(track.controlPoints);
+            List<Vector3> centers = track.Samples;
             int n = centers.Count;
+            // Horizontal "right" vectors: the road tilts along its length
+            // but stays flat across, so its edges are level with the centre.
             var rights = new Vector3[n];
             for (int i = 0; i < n; i++)
             {
@@ -51,11 +63,12 @@ namespace MarioKart.World
             BuildRoad(root, centers, rights, halfWidth, roadColor);
             BuildWall(root, "Barrier_Left", centers, rights, -halfWidth, -1f, wallColor);
             BuildWall(root, "Barrier_Right", centers, rights, halfWidth, 1f, wallColor);
+            BuildTerrain(root, track, groundMaterial);
 
             // The smoothed loop passes through every control point, and
             // sample 0 is control point 0 == checkpoint 0 == start/finish.
             Vector3 finishForward = Vector3.Cross(rights[0], Vector3.up);
-            BuildFinishLine(root, centers[0], finishForward, rights[0], halfWidth);
+            BuildFinishLine(root, centers[0], finishForward, track.SampleTangent(0), rights[0], halfWidth);
         }
 
         public static Color SurfaceColor(string surface)
@@ -74,7 +87,9 @@ namespace MarioKart.World
 
         // ------------------------------------------------------------------
 
-        private static void BuildFinishLine(Transform root, Vector3 center, Vector3 forward, Vector3 right, float halfWidth)
+        /// <param name="forward">Horizontal direction of travel (posts and banner stay upright).</param>
+        /// <param name="slopeForward">Direction of travel along the road surface, so the strip lies on a hill instead of cutting through it.</param>
+        private static void BuildFinishLine(Transform root, Vector3 center, Vector3 forward, Vector3 slopeForward, Vector3 right, float halfWidth)
         {
             var finish = new GameObject("FinishLine");
             finish.transform.SetPositionAndRotation(center, Quaternion.LookRotation(forward, Vector3.up));
@@ -87,10 +102,10 @@ namespace MarioKart.World
             var builder = new MeshBuilder();
             float halfDepth = FinishStripDepth * 0.5f;
             Vector3 up = Vector3.up * (RoadHeight + 0.03f); // above the road, no z-fighting
-            Vector3 a = center - right * halfWidth - forward * halfDepth + up;
-            Vector3 b = center - right * halfWidth + forward * halfDepth + up;
-            Vector3 c = center + right * halfWidth + forward * halfDepth + up;
-            Vector3 d = center + right * halfWidth - forward * halfDepth + up;
+            Vector3 a = center - right * halfWidth - slopeForward * halfDepth + up;
+            Vector3 b = center - right * halfWidth + slopeForward * halfDepth + up;
+            Vector3 c = center + right * halfWidth + slopeForward * halfDepth + up;
+            Vector3 d = center + right * halfWidth - slopeForward * halfDepth + up;
             float uMax = (halfWidth * 2f) / FinishCheckerSize / 2f;
             float vMax = FinishStripDepth / FinishCheckerSize / 2f;
             builder.AddQuad(a, b, c, d, Vector3.up,
@@ -163,13 +178,100 @@ namespace MarioKart.World
             }
 
             // No outline: a flat ribbon has no silhouette worth drawing.
-            var go = CreateMeshObject(root, "Road", builder, color, withCollider: false, outline: false);
+            // The collider is what the karts drive on (the ground plane is
+            // below the road wherever it climbs).
+            var go = CreateMeshObject(root, "Road", builder, color, withCollider: true, outline: false);
             go.isStatic = true;
-            // Receive only. A flat surface at ground level has nothing to
-            // cast onto, and letting it cast makes it shadow *itself*
-            // (shadow acne) -- which shows up as a huge dark blot around the
-            // camera that fades out at the shadow distance.
+            // Receive only. A near-flat surface has little to cast onto, and
+            // letting it cast makes it shadow *itself* (shadow acne) -- which
+            // shows up as a huge dark blot around the camera that fades out
+            // at the shadow distance.
             go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        /// <summary>
+        /// The embankments, as one height-field mesh over the loop's
+        /// footprint sampled from GeneratedTrack.GroundHeightAt -- the same
+        /// function that rests environment objects on the ground, so what
+        /// you see is exactly what they stand on. A regular grid cannot fold
+        /// or leave holes the way strips extruded along the road do on the
+        /// inside of tight bends. Beyond the embankments it lies at
+        /// GroundLevel, a hair above the Ground plane and in the same
+        /// material, so the two blend. Under the road it dips slightly so
+        /// the road surface never z-fights it.
+        /// </summary>
+        private static void BuildTerrain(Transform root, GeneratedTrack track, Material groundMaterial)
+        {
+            var samples = track.Samples;
+            var min = new Vector2(float.MaxValue, float.MaxValue);
+            var max = new Vector2(float.MinValue, float.MinValue);
+            foreach (var p in samples)
+            {
+                min = Vector2.Min(min, new Vector2(p.x, p.z));
+                max = Vector2.Max(max, new Vector2(p.x, p.z));
+            }
+            float margin = track.MaxApronReach() + TerrainMargin;
+            min -= Vector2.one * margin;
+            max += Vector2.one * margin;
+
+            // Cell size grows with the footprint so a 2 km loop doesn't build
+            // a million-vertex mesh.
+            float extent = Mathf.Max(max.x - min.x, max.y - min.y);
+            float cell = Mathf.Max(TerrainCellSize, extent / TerrainMaxCellsPerSide);
+            int cols = Mathf.CeilToInt((max.x - min.x) / cell) + 1;
+            int rows = Mathf.CeilToInt((max.y - min.y) / cell) + 1;
+
+            float roadInner = track.width * 0.5f - 1f; // dip fully this far in from the wall...
+            float roadEdge = track.width * 0.5f;       // ...and ramp back up to the wall base
+            var vertices = new Vector3[cols * rows];
+            var uvs = new Vector2[cols * rows];
+            for (int r = 0; r < rows; r++)
+            {
+                for (int c = 0; c < cols; c++)
+                {
+                    var flat = new Vector3(min.x + c * cell, 0f, min.y + r * cell);
+                    float y = track.GroundHeightAt(flat, out float lateral);
+                    if (lateral < roadEdge)
+                    {
+                        float t = Mathf.InverseLerp(roadEdge, roadInner, lateral);
+                        y -= UnderRoadDip * t;
+                    }
+                    vertices[r * cols + c] = new Vector3(flat.x, y, flat.z);
+                    uvs[r * cols + c] = new Vector2(flat.x, flat.z) / TerrainUvMetres;
+                }
+            }
+
+            var triangles = new int[(cols - 1) * (rows - 1) * 6];
+            int t3 = 0;
+            for (int r = 0; r < rows - 1; r++)
+            {
+                for (int c = 0; c < cols - 1; c++)
+                {
+                    int a = r * cols + c, b = a + 1, d = a + cols, e = d + 1;
+                    // Clockwise seen from above (Unity's front face).
+                    triangles[t3++] = a; triangles[t3++] = d; triangles[t3++] = b;
+                    triangles[t3++] = b; triangles[t3++] = d; triangles[t3++] = e;
+                }
+            }
+
+            var mesh = new Mesh { name = "Terrain", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(vertices);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            var go = new GameObject("Terrain");
+            go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            go.transform.SetParent(root, worldPositionStays: true);
+            go.isStatic = true;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = groundMaterial != null
+                ? groundMaterial
+                : ToonStyle.Create(new Color(0.35f, 0.45f, 0.3f), outline: false, name: "Terrain");
+            // Receive only, like the ground plane it extends.
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         /// <summary>
@@ -228,9 +330,11 @@ namespace MarioKart.World
 
         /// <summary>
         /// Closed Catmull-Rom spline through the control points, so the road
-        /// and walls curve instead of kinking at every control point.
+        /// and walls curve instead of kinking at every control point. Also
+        /// smooths the elevation, so hills roll instead of creasing. Exposed
+        /// for GeneratedTrack.Samples, which everything else queries.
         /// </summary>
-        private static List<Vector3> SmoothLoop(List<Vector3> points)
+        public static List<Vector3> SmoothLoop(List<Vector3> points)
         {
             int n = points.Count;
             var result = new List<Vector3>(n * SubdivisionsPerSegment);

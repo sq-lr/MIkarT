@@ -45,7 +45,9 @@ GeneratedMeshLoader polls GET /assets/{task_id}, swaps GLBs in    │
 ✓ One image
 ✓ One text description
 ✓ One generated world, shared by both players
-✓ One simple loop track
+✓ One simple loop track, with seed-derived hills and one drop scaled by
+  `track.difficulty` (road on embankments; objects rest on the local
+  ground height — `GeneratedTrack.GroundHeightAt`)
 ✓ Two local players, same keyboard
 ✓ Split-screen (top/bottom)
 ✓ Keyboard controls (no controller support yet)

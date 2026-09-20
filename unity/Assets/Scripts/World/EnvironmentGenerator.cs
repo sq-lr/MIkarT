@@ -78,7 +78,7 @@ namespace MarioKart.World
         public Vector2 sinkRange = new Vector2(0.05f, 0.15f);
         public float hueJitter = 0.03f, saturationJitter = 0.10f, valueJitter = 0.15f;
 
-        private const float WallThickness = 0.5f; // matches TrackMeshBuilder
+        private const float WallThickness = TrackMeshBuilder.WallThickness;
 
         private enum Role { Filler, Roadside, Landmark, Horizon }
 
@@ -361,6 +361,14 @@ namespace MarioKart.World
         private GameObject Spawn(AssetDefinition definition, Vector3 position, float yaw, float scaleMultiplier,
             Role role, WorldRandom rng, TrackLayout layout)
         {
+            // Callers compute x/z from a control point (which carries the
+            // road's elevation) plus horizontal offsets; the height that
+            // matters is the ground's at the final spot -- road level on the
+            // berm beside the walls, part-way down the embankment further
+            // out, the plain beyond it. No random draws, so this never
+            // perturbs the placement sequence.
+            position.y = layout.GroundHeightAt(position);
+
             Vector3 scale = definition.defaultScale * scaleMultiplier;
             float footprint = Mathf.Max(scale.x, scale.z) * 0.5f + 0.5f;
             if (role != Role.Horizon && !layout.IsFree(position, footprint)) return null;
