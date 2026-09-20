@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GLTFast;
 using MarioKart.AI;
 using MarioKart.Core;
+using MarioKart.Rendering;
 using UnityEngine;
 
 namespace MarioKart.AssetsSystem
@@ -265,6 +266,8 @@ namespace MarioKart.AssetsSystem
                 var groundOffset = groundPoint - new Vector3(scaled.center.x, scaled.min.y, scaled.center.z);
                 copy.transform.position += groundOffset;
             }
+
+            GhibliLook.RestyleTree(copy);
 
             if (placeholderRenderer != null)
             {

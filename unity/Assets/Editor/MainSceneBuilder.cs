@@ -65,9 +65,9 @@ namespace MarioKart.EditorTools
             }
 
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            var kartRed = EnsureMaterial("Kart_P1", new Color(0.85f, 0.2f, 0.2f));
-            var kartBlue = EnsureMaterial("Kart_P2", new Color(0.2f, 0.4f, 0.9f));
-            var groundMat = EnsureMaterial("Ground", new Color(0.35f, 0.55f, 0.3f));
+            var kartRed = EnsureMaterial("Kart_P1", new Color(0.82f, 0.38f, 0.32f));
+            var kartBlue = EnsureMaterial("Kart_P2", new Color(0.42f, 0.52f, 0.68f));
+            var groundMat = EnsureMaterial("Ground", new Color(0.55f, 0.68f, 0.42f));
 
             // ---- Lighting ----------------------------------------------------
             var sun = new GameObject("Directional Light", typeof(Light)).GetComponent<Light>();
@@ -98,6 +98,9 @@ namespace MarioKart.EditorTools
 
             var checkpoints = new GameObject("Checkpoints");
             checkpoints.transform.SetParent(worldGenerator.transform);
+
+            var obstacles = new GameObject("Obstacles", typeof(ObstacleGenerator));
+            obstacles.transform.SetParent(worldGenerator.transform);
 
             var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
             ground.name = "Ground";
@@ -139,6 +142,7 @@ namespace MarioKart.EditorTools
             Set(worldGenerator, "environmentGenerator", environmentGenerator);
             Set(worldGenerator, "trackVisualRoot", trackVisual.transform);
             Set(worldGenerator, "checkpointRoot", checkpoints.transform);
+            Set(worldGenerator, "obstacleRoot", obstacles.transform);
             Set(worldGenerator, "sunLight", sun);
             Set(worldGenerator, "groundRenderer", groundRenderer);
 
@@ -196,7 +200,8 @@ namespace MarioKart.EditorTools
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material == null)
             {
-                material = new Material(Shader.Find("Standard"));
+                var shader = Shader.Find("MarioKart/GhibliLit") ?? Shader.Find("Standard");
+                material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path);
             }
             material.color = color;
@@ -259,8 +264,9 @@ namespace MarioKart.EditorTools
             // Tight, high chase cam: close behind and well above the kart,
             // pitched ~28° down at the road just ahead of it.
             var follow = go.GetComponent<PlayerCamera>();
-            follow.offset = new Vector3(0f, 3.5f, -3.5f);
-            follow.lookOffset = new Vector3(0f, 0f, 3f);
+            follow.offset = new Vector3(0f, 4.4f, -5.4f);
+            follow.lookOffset = new Vector3(0f, 1.15f, 4f);
+            go.AddComponent<MarioKart.Rendering.GhibliPostEffect>();
             go.transform.position = target.TransformPoint(follow.offset);
             go.transform.LookAt(target.TransformPoint(follow.lookOffset));
 
