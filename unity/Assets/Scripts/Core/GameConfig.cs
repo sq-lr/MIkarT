@@ -22,5 +22,12 @@ namespace MarioKart.Core
         public bool enableGeneratedMeshes = true;
         public float assetPollIntervalSeconds = 5f;
         public float assetPollTimeoutSeconds = 600f;
+
+        // Hold the "Generating" screen until every generated mesh has landed
+        // (or failed / timed out), instead of racing on placeholders while
+        // they stream in. On timeout the race starts anyway and any mesh
+        // that finishes later still swaps in -- the game never gets stuck.
+        public bool waitForGeneratedMeshes = true;
+        public float meshWaitTimeoutSeconds = 300f;
     }
 }

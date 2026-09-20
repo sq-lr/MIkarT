@@ -1,0 +1,89 @@
+Live test: text description -> ClaudeTextAssetService.extract() -> TextAssetExtraction JSON
+No Meshy calls made; this only exercises the Claude text-extraction step.
+====================================================================================================
+
+Example 1
+Input description: 'a chaotic tropical paradise with a giant floating whale statue made of driftwood'
+Output:
+{
+  "key_assets": [
+    {
+      "label": "driftwood_whale_statue",
+      "prompt": "A colossal sculpture of a whale assembled entirely from weathered driftwood planks and branches, its body built from overlapping sun-bleached grey and pale tan slats lashed together with frayed rope, gaps between the timbers revealing the hollow interior. Long arching flukes and broad pectoral fins made of curved, knotted wood; a rough ribbed underside suggesting baleen grooves. Surface texture is splintered, salt-worn, and cracked, with patches of silvery grain, faint barnacle crusting, and dried seaweed caught in the joints. Mounted atop a low base of stacked coral rock and pale sand. Handcrafted folk-art style, warm natural wood tones against cool grey driftwood.",
+      "density": 0.15,
+      "placement": "landmark"
+    }
+  ]
+}
+----------------------------------------------------------------------------------------------------
+
+Example 2
+Input description: 'a snowy mountain village'
+Output:
+{
+  "key_assets": [
+    {
+      "label": "alpine_chalet",
+      "prompt": "A small traditional alpine chalet: a two-story timber cottage with dark stained pine log walls, carved wooden balcony railings with heart cutouts, shuttered windows with deep red painted frames, and a steep gabled roof covered in a thick rounded blanket of fresh white snow with icicles hanging along the eaves. A stone chimney of grey rounded river rock rises from one side, and a small stacked firewood pile sits against the base wall. Weathered wood grain, warm honey-brown and deep brown tones contrasted with crisp white snow, cozy storybook Swiss village style, clean stylized low-poly-friendly forms.",
+      "density": 0.55,
+      "placement": "roadside"
+    }
+  ]
+}
+----------------------------------------------------------------------------------------------------
+
+Example 3
+Input description: 'a desert canyon with a towering ancient stone dragon statue guarding a rope bridge, and neon vending machines scattered near the pit stop'
+Output:
+{
+  "key_assets": [
+    {
+      "label": "stone_dragon_statue",
+      "prompt": "A towering ancient carved stone dragon statue, weathered sandstone in warm ochre and tan tones, coiled serpentine body rising on a cracked rectangular plinth, folded wings pressed against its flanks, long neck arched upward with jaws parted, rows of chiseled scales and spinal spikes, clawed forefeet resting on the base, eroded edges, sand-filled crevices, faint traces of carved geometric desert motifs around the pedestal, sun-bleached surface with darker weathering streaks, monumental temple-guardian sculpture style, matte rough rock texture",
+      "density": 0.15,
+      "placement": "landmark"
+    },
+    {
+      "label": "rope_bridge",
+      "prompt": "A rustic suspended rope bridge, thick braided hemp ropes in faded brown, weathered grey wooden planks with gaps and a few missing boards, rope handrails strung with vertical cord lashings, sturdy timber anchor posts and stacked stone footings at each end, frayed fiber details, sun-bleached and dusty surfaces, gentle sagging catenary curve, simple handmade desert canyon crossing construction",
+      "density": 0.1,
+      "placement": "landmark"
+    },
+    {
+      "label": "neon_vending_machine",
+      "prompt": "A boxy retro-futuristic vending machine, glossy enameled metal cabinet in deep charcoal with magenta and cyan neon tube trim outlining its edges, glowing front panel window displaying rows of colorful canned drinks, illuminated pink button grid and a softly lit dispensing slot at the bottom, brushed aluminum side panels, small rubber feet, faint dust film and scratches on the casing, vivid emissive neon glow against dark metal, clean stylized hardware",
+      "density": 0.55,
+      "placement": "roadside"
+    }
+  ]
+}
+----------------------------------------------------------------------------------------------------
+
+Example 4
+Input description: "a spooky night carnival with a rusted ferris wheel and a fortune teller's tent"
+Output:
+{
+  "key_assets": [
+    {
+      "label": "rusted_ferris_wheel",
+      "prompt": "A large abandoned ferris wheel built from heavily rusted steel lattice beams, orange-brown corrosion streaking down flaking cream and red paint. A circular spoked wheel with a central hub and radial tension cables, ringed by a dozen swinging open-air passenger gondolas with peeling paint, bent safety bars and missing floor slats. Dead bulb sockets and cracked colored glass lamps line the spokes, a few dangling loose on frayed wires. Bolted A-frame support legs sit on a cracked concrete base with weeds at the footings. Weathered, derelict amusement-park structure, grimy metal textures, muted desaturated palette of rust, ash grey and faded carnival red.",
+      "density": 0.15,
+      "placement": "landmark"
+    },
+    {
+      "label": "fortune_teller_tent",
+      "prompt": "A small ornate fortune teller's tent: a peaked canvas pavilion of deep purple and midnight blue striped fabric, trimmed with tarnished gold rope, tassels and little crescent-moon and star appliques. Draped entrance flaps tied back with frayed cord reveal a dark interior. Wooden poles support the sagging roof, topped by a bent iron finial. Weathered, dusty fabric with patched holes and faded embroidery, a few hanging lanterns and beaded strands at the doorway, standing on a trampled dirt patch with a low wooden step. Mystical fairground stall, rich jewel-tone colors, aged and slightly tattered.",
+      "density": 0.2,
+      "placement": "landmark"
+    }
+  ]
+}
+----------------------------------------------------------------------------------------------------
+
+Example 5
+Input description: 'a peaceful green meadow with rolling hills'
+Output:
+{
+  "key_assets": []
+}
+----------------------------------------------------------------------------------------------------

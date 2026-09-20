@@ -17,6 +17,8 @@ _HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _TERRAIN_VALUES = {"sand", "grass", "snow", "dirt", "rock", "mud"}
 _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
+_SKY_VALUES = {"sunny", "cloudy", "sunset", "night"}
+_TRACK_SURFACE_VALUES = {"concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"}
 _ASSET_PROVIDER_VALUES = {"meshy"}
 # How Unity should use an object, as judged by the vision model. Mirrors the
 # enum in the schema and DetectedObject.placement in vision_service.py.
@@ -28,14 +30,21 @@ def _clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
+# Unity deserializes `seed` into a signed 32-bit int (WorldRecipe.cs,
+# WorldRandom), and the schema caps it there. Derived seeds must fit.
+MAX_SEED = 2**31 - 1
+
+
 def derive_seed(*parts: str) -> int:
     """Deterministically derive a seed from arbitrary string parts.
 
     Used whenever an upstream seed is missing, so "same input -> same world"
-    still holds instead of falling back to a random or fixed value.
+    still holds instead of falling back to a random or fixed value. Masked to
+    31 bits so it always fits Unity's Int32 (a full 32-bit prefix overflowed
+    it and made Unity fall back to the default world).
     """
     digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
-    return int(digest[:8], 16)
+    return int(digest[:8], 16) & MAX_SEED
 
 
 class WorldInfo(BaseModel):
@@ -44,6 +53,7 @@ class WorldInfo(BaseModel):
     terrain: str
     weather: str
     time_of_day: str
+    sky: str = "sunny"
 
     @field_validator("terrain")
     @classmethod
@@ -66,16 +76,31 @@ class WorldInfo(BaseModel):
             raise ValueError(f"time_of_day must be one of {sorted(_TIME_OF_DAY_VALUES)}")
         return v
 
+    @field_validator("sky")
+    @classmethod
+    def _valid_sky(cls, v: str) -> str:
+        if v not in _SKY_VALUES:
+            raise ValueError(f"sky must be one of {sorted(_SKY_VALUES)}")
+        return v
+
 
 class TrackInfo(BaseModel):
     width: float = Field(gt=0)
     length: float = Field(gt=0)
     difficulty: float
+    surface: str = "concrete"
 
     @field_validator("difficulty")
     @classmethod
     def _clamp_difficulty(cls, v: float) -> float:
         return _clamp(v, 0.0, 1.0)
+
+    @field_validator("surface")
+    @classmethod
+    def _valid_surface(cls, v: str) -> str:
+        if v not in _TRACK_SURFACE_VALUES:
+            raise ValueError(f"surface must be one of {sorted(_TRACK_SURFACE_VALUES)}")
+        return v
 
 
 class ObjectAsset(BaseModel):
@@ -120,7 +145,7 @@ class WorldObjectEntry(BaseModel):
 
 class WorldRecipe(BaseModel):
     version: int = 1
-    seed: int | None = None
+    seed: int | None = Field(default=None, ge=0, le=MAX_SEED)
     world: WorldInfo
     track: TrackInfo
     objects: list[WorldObjectEntry] = Field(default_factory=list, max_length=12)

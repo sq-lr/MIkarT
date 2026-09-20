@@ -15,6 +15,7 @@ namespace MarioKart.AI
         public string terrain;
         public string weather;
         public string time_of_day;
+        public string sky = "sunny";
     }
 
     [Serializable]
@@ -23,6 +24,7 @@ namespace MarioKart.AI
         public float width;
         public float length;
         public float difficulty;
+        public string surface = "concrete";
     }
 
     /// <summary>

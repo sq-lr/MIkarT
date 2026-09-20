@@ -1,0 +1,57 @@
+{
+  "world_recipe": {
+    "version": 1,
+    "seed": 2658555187,
+    "world": {
+      "name": "Tropical Paradise",
+      "theme": "tropical beach",
+      "terrain": "sand",
+      "weather": "sunny",
+      "time_of_day": "day"
+    },
+    "track": {
+      "width": 8.0,
+      "length": 800.0,
+      "difficulty": 0.5
+    },
+    "objects": [
+      {
+        "type": "wire_mesh_sculpture",
+        "density": 0.75,
+        "asset": {
+          "task_id": "01a0bb24-51de-7608-8680-c072484a3564",
+          "provider": "meshy"
+        }
+      },
+      {
+        "type": "bare_tree",
+        "density": 0.6,
+        "asset": {
+          "task_id": "01a0bb24-51dc-72be-812a-fb0aa8890618",
+          "provider": "meshy"
+        }
+      },
+      {
+        "type": "information_kiosk",
+        "density": 0.4,
+        "asset": {
+          "task_id": "01a0bb24-51dc-72bc-a368-9364a929a09b",
+          "provider": "meshy"
+        }
+      },
+      {
+        "type": "concrete_building",
+        "density": 0.3,
+        "asset": {
+          "task_id": "01a0bb24-51dd-75a7-a210-db69c0b90e57",
+          "provider": "meshy"
+        }
+      }
+    ],
+    "palette": [
+      "#2E8B57",
+      "#F4D35E",
+      "#2D9CDB"
+    ]
+  }
+}

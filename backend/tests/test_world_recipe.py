@@ -27,8 +27,9 @@ VALID_RECIPE = {
         "terrain": "sand",
         "weather": "sunny",
         "time_of_day": "day",
+        "sky": "sunny",
     },
-    "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5},
+    "track": {"width": 8.0, "length": 800.0, "difficulty": 0.5, "surface": "concrete"},
     "objects": [
         {"type": "palm_tree", "density": 0.5, "placement": "roadside", "asset": {"task_id": "0193a0c1-abcd", "provider": "meshy"}},
         {"type": "rock", "density": 0.2},
@@ -85,6 +86,22 @@ def test_invalid_density_normalized():
     assert recipe.objects[1].density == 0.0
 
 
+def test_derived_seeds_fit_unity_int32():
+    from app.models.world_recipe import MAX_SEED, derive_seed
+
+    # "Tropical Paradise" used to hash to 2745161991 (> Int32.MaxValue) and
+    # made Unity reject the whole recipe. Check that and a spread of inputs.
+    assert derive_seed("Tropical Paradise", "tropical beach") <= MAX_SEED
+    assert all(0 <= derive_seed(f"input-{i}") <= MAX_SEED for i in range(500))
+
+    data = json.loads(json.dumps(VALID_RECIPE))
+    data["seed"] = MAX_SEED + 1
+    with pytest.raises(ValidationError):
+        WorldRecipe.model_validate(data)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(data, _load_schema())
+
+
 def test_missing_seed_handled_deterministically():
     data = json.loads(json.dumps(VALID_RECIPE))
     del data["seed"]
@@ -101,6 +118,14 @@ def test_missing_world_fields_rejected():
     del data["world"]
     with pytest.raises(ValidationError):
         WorldRecipe.model_validate(data)
+
+
+def test_generate_world_endpoint_accepts_blank_description():
+    client = TestClient(app)
+    for data in ({}, {"description": ""}, {"description": "   "}):
+        response = client.post("/generate-world", files={"image": ("test.png", make_png(), "image/png")}, data=data)
+        assert response.status_code == 200, data
+        jsonschema.validate(response.json()["world_recipe"], _load_schema())
 
 
 def test_generate_world_endpoint_returns_valid_recipe():
@@ -147,6 +172,37 @@ def test_synthesis_is_deterministic():
     assert [o.type for o in recipe_a.objects] == ["palm_tree", "rock"]
 
 
+def test_synthesis_preserves_selected_sky():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+
+    recipe = service.synthesize(scene, "make it a beach paradise", sky="sunset")
+
+    assert recipe.world.sky == "sunset"
+
+
+def test_synthesis_selects_track_surface_from_scene():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#C2B280"],
+        brightness=0.7,
+        tags=["desert"],
+        track_surface="dirt",
+    )
+
+    recipe = service.synthesize(scene, "desert race")
+
+    assert recipe.track.surface == "dirt"
+
+
+def test_track_surface_values_are_validated():
+    data = json.loads(json.dumps(VALID_RECIPE))
+    data["track"]["surface"] = "water"
+
+    with pytest.raises(ValidationError):
+        WorldRecipe.model_validate(data)
+
+
 def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
     service = MockWorldSynthesisService()
     scene = SceneUnderstanding(
@@ -171,7 +227,7 @@ def test_synthesis_uses_detected_objects_and_attaches_mesh_tasks():
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
 
 
-def test_synthesis_passes_placement_through_and_allows_one_landmark():
+def test_synthesis_passes_placement_through_and_allows_two_landmarks():
     service = MockWorldSynthesisService()
     scene = SceneUnderstanding(
         dominant_colors=["#2E8B57"],
@@ -182,6 +238,7 @@ def test_synthesis_passes_placement_through_and_allows_one_landmark():
             DetectedObject(label="lighthouse", bbox=[0.4, 0.0, 0.2, 0.9], prominence=0.6, placement="landmark"),
             DetectedObject(label="mountain", bbox=[0.0, 0.0, 1.0, 0.4], prominence=0.5, placement="background"),
             DetectedObject(label="statue", bbox=[0.7, 0.5, 0.2, 0.4], prominence=0.4, placement="landmark"),  # second landmark
+            DetectedObject(label="flagpole", bbox=[0.6, 0.6, 0.1, 0.3], prominence=0.35, placement="landmark"),  # third landmark
             DetectedObject(label="crate", bbox=[0.8, 0.8, 0.1, 0.1], prominence=0.1),  # no hint -> scattered
         ],
     )
@@ -189,9 +246,10 @@ def test_synthesis_passes_placement_through_and_allows_one_landmark():
     recipe = service.synthesize(scene, "harbour at dusk")
 
     assert {o.type: o.placement for o in recipe.objects} == {
-        "lighthouse": "landmark",  # most prominent landmark wins
+        "lighthouse": "landmark",  # the two most prominent landmarks win
+        "statue": "landmark",
         "mountain": "background",
-        "statue": "scattered",  # demoted: only one landmark per recipe
+        "flagpole": "scattered",  # demoted: at most two landmarks per recipe
         "lamp_post": "roadside",
         "crate": "scattered",
     }
@@ -255,4 +313,61 @@ def test_synthesis_truncates_combined_objects_to_twelve():
     # All 8 photo objects survive; only the first 4 text objects fit.
     assert [o.type for o in recipe.objects[:8]] == [f"photo_{i}" for i in range(8)]
     assert [o.type for o in recipe.objects[8:]] == [f"text_{i}" for i in range(4)]
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_passes_through_text_asset_placement():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(dominant_colors=["#2E8B57"], brightness=0.8, tags=["beach"])
+    text_assets = [
+        ExtractedAsset(label="vending_machine", prompt="p", density=0.4, placement="roadside"),
+        ExtractedAsset(label="dragon_statue", prompt="p", density=0.15, placement="landmark"),
+    ]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["vending_machine"] == "roadside"
+    assert placements["dragon_statue"] == "landmark"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_allows_one_photo_and_one_text_landmark():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[DetectedObject(label="lighthouse", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.9, placement="landmark")],
+    )
+    text_assets = [ExtractedAsset(label="dragon_statue", prompt="p", density=0.15, placement="landmark")]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    # Combined total (1 photo + 1 text) is within the cap of two -- both kept.
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["lighthouse"] == "landmark"
+    assert placements["dragon_statue"] == "landmark"
+    jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())
+
+
+def test_synthesis_demotes_text_landmark_when_photo_already_has_two():
+    service = MockWorldSynthesisService()
+    scene = SceneUnderstanding(
+        dominant_colors=["#2E8B57"],
+        brightness=0.8,
+        tags=["beach"],
+        detected_objects=[
+            DetectedObject(label="lighthouse", bbox=[0.1, 0.1, 0.2, 0.4], prominence=0.9, placement="landmark"),
+            DetectedObject(label="pier", bbox=[0.5, 0.5, 0.3, 0.3], prominence=0.7, placement="landmark"),
+        ],
+    )
+    text_assets = [ExtractedAsset(label="dragon_statue", prompt="p", density=0.15, placement="landmark")]
+
+    recipe = service.synthesize(scene, "beach", [], text_assets, [])
+
+    placements = {o.type: o.placement for o in recipe.objects}
+    assert placements["lighthouse"] == "landmark"
+    assert placements["pier"] == "landmark"
+    assert placements["dragon_statue"] == "scattered"  # demoted -- the cap of two is already used by the photo
     jsonschema.validate(json.loads(recipe.model_dump_json(exclude_none=True)), _load_schema())

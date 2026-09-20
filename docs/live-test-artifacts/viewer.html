@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Generated mesh viewer</title>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #1c1c1e; color: #eee; margin: 0; padding: 24px; }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  h2 { font-size: 13px; font-weight: 500; color: #aaa; margin: 32px 0 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: #2c2c2e; border-radius: 12px; overflow: hidden; }
+  .card model-viewer { width: 100%; height: 280px; background: #3a3a3c; }
+  .label { padding: 10px 14px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Generated mesh viewer</h1>
+<p style="color:#999; font-size:13px;">Drag to rotate, scroll to zoom.</p>
+
+<h2>Stage 3 (sequential submit) — meshes/</h2>
+<div class="grid">
+  <div class="card"><model-viewer src="meshes/wire_mesh_sculpture.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">wire_mesh_sculpture</div></div>
+  <div class="card"><model-viewer src="meshes/bare_tree.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bare_tree</div></div>
+  <div class="card"><model-viewer src="meshes/information_kiosk.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">information_kiosk</div></div>
+  <div class="card"><model-viewer src="meshes/concrete_building.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">concrete_building</div></div>
+</div>
+
+<h2>Stage 3 parallel (concurrent submit) — meshes-parallel/</h2>
+<div class="grid">
+  <div class="card"><model-viewer src="meshes-parallel/wire_mesh_sculpture.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">wire_mesh_sculpture</div></div>
+  <div class="card"><model-viewer src="meshes-parallel/bare_tree.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">bare_tree</div></div>
+  <div class="card"><model-viewer src="meshes-parallel/information_kiosk.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">information_kiosk</div></div>
+  <div class="card"><model-viewer src="meshes-parallel/concrete_building.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">concrete_building</div></div>
+</div>
+
+<h2>Stage 4 (text-to-3d, preview&#8594;refine) — meshes-text-to-3d/</h2>
+<div class="grid">
+  <div class="card"><model-viewer src="meshes-text-to-3d/driftwood_whale_statue_preview_untextured.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">driftwood_whale_statue — preview (untextured geometry only)</div></div>
+  <div class="card"><model-viewer src="meshes-text-to-3d/driftwood_whale_statue.glb" camera-controls auto-rotate shadow-intensity="1"></model-viewer><div class="label">driftwood_whale_statue — refined (final, textured)</div></div>
+</div>
+
+</body>
+</html>

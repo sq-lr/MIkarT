@@ -1,0 +1,49 @@
+{
+    "world_recipe": {
+        "version": 1,
+        "seed": 164949559,
+        "world": {
+            "name": "Tropical Paradise",
+            "theme": "tropical beach",
+            "terrain": "sand",
+            "weather": "sunny",
+            "time_of_day": "day"
+        },
+        "track": {
+            "width": 16.0,
+            "length": 800.0,
+            "difficulty": 0.5
+        },
+        "objects": [
+            {
+                "type": "palm_tree",
+                "density": 0.5,
+                "asset": {
+                    "task_id": "01a0bb80-039f-74dc-830a-72fba3289e86",
+                    "provider": "meshy"
+                }
+            },
+            {
+                "type": "rock",
+                "density": 0.2,
+                "asset": {
+                    "task_id": "01a0bb80-051b-7253-b06c-9d1cbb700300",
+                    "provider": "meshy"
+                }
+            },
+            {
+                "type": "driftwood_whale_statue",
+                "density": 0.12,
+                "asset": {
+                    "task_id": "01a0bb80-0673-761a-9908-534d976df45d",
+                    "provider": "meshy"
+                }
+            }
+        ],
+        "palette": [
+            "#2E8B57",
+            "#F4D35E",
+            "#2D9CDB"
+        ]
+    }
+}

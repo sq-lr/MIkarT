@@ -31,6 +31,10 @@ namespace MarioKart.World
 
         public GeneratedTrack CurrentTrack { get; private set; }
 
+        /// <summary>The generated-mesh loader, so GameManager can wait on it.</summary>
+        public MarioKart.AssetsSystem.GeneratedMeshLoader MeshLoader =>
+            environmentGenerator != null ? environmentGenerator.MeshLoader : null;
+
         public void Generate(WorldRecipe recipe)
         {
             int trackSeed = WorldRandom.DeriveSeed(recipe.seed, "track");
@@ -39,7 +43,7 @@ namespace MarioKart.World
             var track = new TrackGenerator().Generate(recipe, trackSeed);
             CurrentTrack = track;
 
-            BuildTrackVisual(track, recipe.palette);
+            BuildTrackVisual(track, recipe.palette, recipe.track != null ? recipe.track.surface : "concrete");
             BuildCheckpoints(track);
 
             if (environmentGenerator != null)
@@ -51,6 +55,7 @@ namespace MarioKart.World
             obstacles.Generate(track, recipe.seed);
 
             ApplyTheme(recipe);
+            ApplySky(recipe.world != null ? recipe.world.sky : "sunny");
 
             OnWorldReady?.Invoke();
         }
@@ -59,16 +64,16 @@ namespace MarioKart.World
         /// Dirt-path ribbon + wooden fences (see TrackMeshBuilder). Palette
         /// tints the path and moss kerbs without turning them back into asphalt.
         /// </summary>
-        private void BuildTrackVisual(GeneratedTrack track, List<string> palette)
+        private void BuildTrackVisual(GeneratedTrack track, List<string> palette, string surface)
         {
             if (trackVisualRoot == null) return;
 
-            var roadColor = Color.Lerp(GhibliLook.PathDirt, Color.white, 0.05f);
+            var roadColor = Color.Lerp(GhibliLook.PathDirt, TrackMeshBuilder.SurfaceColor(surface), 0.4f);
             var wallColor = GhibliLook.FenceWood;
             var curbColor = GhibliLook.Moss;
             if (palette != null && palette.Count > 1 && ColorUtility.TryParseHtmlString(palette[1], out var ground))
             {
-                roadColor = Color.Lerp(GhibliLook.PathDirt, ground, 0.2f);
+                roadColor = Color.Lerp(roadColor, ground, 0.2f);
                 curbColor = Color.Lerp(GhibliLook.Moss, ground, 0.35f);
             }
             if (palette != null && palette.Count > 2 && ColorUtility.TryParseHtmlString(palette[2], out var tint))
@@ -270,6 +275,71 @@ namespace MarioKart.World
         private void OnDestroy()
         {
             if (skyboxMaterial != null) Destroy(skyboxMaterial);
+        }
+
+        /// <summary>
+        /// Sky preset chosen on the upload screen (recipe.world.sky). Tints
+        /// the Totoro watercolor skybox; sunny leaves ApplyTheme as-is.
+        /// Cameras stay on the skybox so the Ghibli horizon still reads.
+        /// </summary>
+        private void ApplySky(string sky)
+        {
+            Color skyTop;
+            Color skyHorizon;
+            Color ambient;
+            Color sunColor;
+            float sunPitch = 38f;
+            float sunIntensity = 0.95f;
+            switch (sky)
+            {
+                case "cloudy":
+                    skyTop = new Color(0.55f, 0.62f, 0.70f);
+                    skyHorizon = new Color(0.82f, 0.82f, 0.78f);
+                    ambient = new Color(0.55f, 0.60f, 0.58f);
+                    sunColor = new Color(0.85f, 0.86f, 0.88f);
+                    sunIntensity = 0.7f;
+                    break;
+                case "sunset":
+                    skyTop = new Color(0.55f, 0.42f, 0.62f);
+                    skyHorizon = new Color(0.98f, 0.72f, 0.48f);
+                    ambient = new Color(0.72f, 0.42f, 0.32f);
+                    sunColor = new Color(1f, 0.62f, 0.38f);
+                    sunPitch = 12f;
+                    sunIntensity = 0.7f;
+                    break;
+                case "night":
+                    skyTop = new Color(0.18f, 0.24f, 0.42f);
+                    skyHorizon = new Color(0.35f, 0.32f, 0.40f);
+                    ambient = new Color(0.18f, 0.22f, 0.32f);
+                    sunColor = new Color(0.55f, 0.62f, 0.85f);
+                    sunPitch = 12f;
+                    sunIntensity = 0.35f;
+                    break;
+                default:
+                    foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+                    {
+                        camera.clearFlags = CameraClearFlags.Skybox;
+                    }
+                    return;
+            }
+
+            RenderSettings.ambientLight = ambient;
+            if (skyboxMaterial != null)
+            {
+                if (skyboxMaterial.HasProperty("_SkyTop")) skyboxMaterial.SetColor("_SkyTop", skyTop);
+                if (skyboxMaterial.HasProperty("_SkyHorizon")) skyboxMaterial.SetColor("_SkyHorizon", skyHorizon);
+                if (skyboxMaterial.HasProperty("_SkyTint")) skyboxMaterial.SetColor("_SkyTint", skyTop);
+            }
+            if (sunLight != null)
+            {
+                sunLight.color = sunColor;
+                sunLight.intensity = sunIntensity;
+                sunLight.transform.rotation = Quaternion.Euler(sunPitch, -25f, 0f);
+            }
+            foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            {
+                camera.clearFlags = CameraClearFlags.Skybox;
+            }
         }
     }
 }

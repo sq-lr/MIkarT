@@ -41,6 +41,9 @@ namespace MarioKart.World
         // Without it, placeholders are simply never replaced.
         [SerializeField] private GeneratedMeshLoader meshLoader;
 
+        /// <summary>The loader swapping generated meshes in, if any.</summary>
+        public GeneratedMeshLoader MeshLoader => meshLoader;
+
         // Interfaces aren't Unity-serializable, so this is wired in code
         // (not the Inspector).
         private readonly IAssetResolver resolver = new AssetResolver();

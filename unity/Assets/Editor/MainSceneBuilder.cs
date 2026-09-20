@@ -330,11 +330,12 @@ namespace MarioKart.EditorTools
 
         private static GenerationUI BuildGeneratingPanel(Canvas canvas, Font font)
         {
-            var panel = CreatePanel(canvas.transform, "GenerationUI", dim: false, out var holder);
-            var status = CreateText(panel.transform, "Status", "Generating your world...", font, 72, Center, Vector2.zero, new Vector2(1200f, 120f), TextAnchor.MiddleCenter);
+            // Dimmed while generating (GenerationUI drives the alpha), clear
+            // during the countdown so it plays over the freshly built world.
+            var panel = CreatePanel(canvas.transform, "GenerationUI", dim: true, out var holder);
+            var status = CreateText(panel.transform, "Status", "Generating your world...", font, 64, Center, Vector2.zero, new Vector2(1400f, 200f), TextAnchor.MiddleCenter);
 
-            // No dim overlay here so the countdown plays over the freshly built
-            // world; give the text an outline so it reads on any background.
+            // Outline so the countdown reads on any background once the dim clears.
             var outline = status.gameObject.AddComponent<Outline>();
             outline.effectColor = new Color(0f, 0f, 0f, 0.8f);
             outline.effectDistance = new Vector2(3f, -3f);

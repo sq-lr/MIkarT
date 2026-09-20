@@ -17,14 +17,22 @@ router = APIRouter()
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 
+# Used when the player leaves the description blank. Rejecting the request
+# instead (422) made Unity silently fall back to the offline world, which
+# looked like "generation didn't work" -- the photo alone is enough input.
+DEFAULT_DESCRIPTION = "a racing world inspired by this photo"
+
 
 @router.post("/generate-world", response_model=WorldRecipeResponse, response_model_exclude_none=True)
 async def generate_world(
     image: UploadFile = File(...),
-    description: str = Form(..., min_length=1, max_length=500),
+    description: str = Form("", max_length=500),
+    sky: str = Form("sunny"),
 ) -> WorldRecipeResponse:
     if image.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="image must be image/jpeg or image/png")
+
+    description = description.strip() or DEFAULT_DESCRIPTION
 
     image_bytes = await image.read()
     providers = get_providers()
@@ -60,7 +68,14 @@ async def generate_world(
             providers.registry.add(task)
 
         # 4. Assemble the recipe; objects carry their task handles.
-        recipe = providers.synthesis.synthesize(scene, description, image_mesh_tasks, key_assets, text_mesh_tasks)
+        recipe = providers.synthesis.synthesize(
+            scene,
+            description,
+            image_mesh_tasks,
+            key_assets,
+            text_mesh_tasks,
+            sky=sky,
+        )
     except Exception:
         logger.exception("world generation failed")
         raise HTTPException(status_code=500, detail="world generation failed")

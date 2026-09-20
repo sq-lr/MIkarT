@@ -20,6 +20,8 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
 
+from app.services.vision_service import Placement
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,13 +30,17 @@ class ExtractedAsset(BaseModel):
     for even though it wasn't (necessarily) detected in the photo.
 
     `label` becomes WorldRecipe.objects[].type, `density` becomes
-    objects[].density, and `prompt` is sent verbatim to Meshy Text-to-3D as
-    the sole generation context -- it never mentions the racing game itself.
+    objects[].density, `placement` becomes objects[].placement (see
+    app.prompts.text_asset_extraction -- same vocabulary and semantics as
+    DetectedObject.placement, just judged from words instead of pixels), and
+    `prompt` is sent verbatim to Meshy Text-to-3D as the sole generation
+    context -- it never mentions the racing game itself.
     """
 
     label: str = Field(min_length=1, max_length=40)
     prompt: str = Field(min_length=1, max_length=800)
     density: float = Field(ge=0.0, le=1.0)
+    placement: Placement = "scattered"
 
 
 class TextAssetExtraction(BaseModel):

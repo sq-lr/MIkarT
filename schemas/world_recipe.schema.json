@@ -13,9 +13,10 @@
       "const": 1
     },
     "seed": {
-      "description": "Master seed for deterministic generation. All procedural systems must derive their randomness from this value (see WorldRandom.DeriveSeed).",
+      "description": "Master seed for deterministic generation. All procedural systems must derive their randomness from this value (see WorldRandom.DeriveSeed). Capped at 2^31-1: Unity reads it into a signed 32-bit int.",
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 2147483647
     },
     "world": {
       "type": "object",
@@ -44,6 +45,12 @@
         "time_of_day": {
           "type": "string",
           "enum": ["day", "night", "dusk", "dawn"]
+        },
+        "sky": {
+          "description": "Selected race-sky presentation from the upload screen.",
+          "type": "string",
+          "enum": ["sunny", "cloudy", "sunset", "night"],
+          "default": "sunny"
         }
       }
     },
@@ -69,6 +76,12 @@
           "type": "number",
           "minimum": 0.0,
           "maximum": 1.0
+        },
+        "surface": {
+          "description": "Race-road surface selected from the uploaded image.",
+          "type": "string",
+          "enum": ["concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"],
+          "default": "concrete"
         }
       }
     },

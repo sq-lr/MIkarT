@@ -94,15 +94,20 @@ placeholders' transforms and must never move them).
 
 With `MESH_PROVIDER=meshy` (and `AI_PROVIDER=claude`) in `backend/.env`:
 
-1. Press Play, pick an image, generate. The world must appear immediately
-   with primitive placeholders and the countdown must start — the race never
-   waits on meshes.
+1. Press Play, pick an image, generate. The Generating screen should read
+   "Building the track..." then "Waiting for 3D models... 0/2 ready · N%",
+   with the placeholder world dimly visible behind it and the percentage
+   climbing as Meshy reports progress.
 2. Within a few minutes each placeholder type whose recipe entry had an
-   `asset` should be replaced by its Meshy mesh at the same position
-   (placeholder renderer disabled, `<type>_Placeholder_Mesh` sibling added).
-3. Stop the backend mid-poll: after `assetPollTimeoutSeconds` the loader
-   logs one warning per type and the placeholders stay. The race is unaffected.
-4. `GameConfig.enableGeneratedMeshes = false` skips polling entirely.
+   `asset` is replaced by its Meshy mesh at the same position (placeholder
+   renderer disabled, `<type>_Placeholder_Mesh` sibling added); once all are
+   in, the dim clears and the countdown starts.
+3. Stop the backend mid-wait: after `meshWaitTimeoutSeconds` (default 300 s)
+   the countdown starts anyway on placeholders, with one warning in the
+   Console; `assetPollTimeoutSeconds` later the loader gives up per type.
+4. `GameConfig.waitForGeneratedMeshes = false` restores stream-in: the
+   countdown starts immediately and meshes swap in mid-race.
+   `enableGeneratedMeshes = false` skips polling entirely.
 
 ## Conventions
 
