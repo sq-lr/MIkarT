@@ -1,0 +1,73 @@
+Live test: photo -> ClaudeFillerAssetService.suggest() -> FillerAssetExtraction JSON
+max_assets=12 (matches current MAX_FILLER_ASSETS_PER_WORLD default). No Poly Pizza
+calls made here; this only exercises the Claude filler-keyword suggestion step.
+====================================================================================================
+
+Input image: unity/Assets/Resources/mit_image.png (231927 bytes)
+Input description: 'school campus'
+Output:
+{
+  "filler_assets": [
+    {
+      "keyword": "park_bench",
+      "density": 0.5,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "street_lamp",
+      "density": 0.45,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "trash_can",
+      "density": 0.35,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "bicycle_rack",
+      "density": 0.3,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "bollard",
+      "density": 0.4,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "tree",
+      "density": 0.6,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "bush",
+      "density": 0.55,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "hedge",
+      "density": 0.35,
+      "placement": "roadside"
+    },
+    {
+      "keyword": "planter",
+      "density": 0.3,
+      "placement": "scattered"
+    },
+    {
+      "keyword": "office_building",
+      "density": 0.15,
+      "placement": "background"
+    },
+    {
+      "keyword": "brick_building",
+      "density": 0.15,
+      "placement": "background"
+    },
+    {
+      "keyword": "picnic_table",
+      "density": 0.25,
+      "placement": "scattered"
+    }
+  ]
+}
+----------------------------------------------------------------------------------------------------

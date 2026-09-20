@@ -19,7 +19,7 @@ _WEATHER_VALUES = {"sunny", "rainy", "cloudy", "snowy", "clear"}
 _TIME_OF_DAY_VALUES = {"day", "night", "dusk", "dawn"}
 _SKY_VALUES = {"sunny", "cloudy", "sunset", "night"}
 _TRACK_SURFACE_VALUES = {"concrete", "red_bricks", "grey_tiles", "stone_slabs", "dirt"}
-_ASSET_PROVIDER_VALUES = {"meshy"}
+_ASSET_PROVIDER_VALUES = {"meshy", "polypizza"}
 # How Unity should use an object, as judged by the vision model. Mirrors the
 # enum in the schema and DetectedObject.placement in vision_service.py.
 PLACEMENT_VALUES = {"landmark", "roadside", "background", "scattered"}

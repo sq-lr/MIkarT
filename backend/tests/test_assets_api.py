@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import providers as providers_module
+from app.services.library_asset_service import MockLibraryAssetService
+from app.services.filler_asset_service import MockFillerAssetService
 from app.services.mesh_generation_service import MeshGenerationService, MeshTask, MeshTaskRegistry, MeshTaskStatus
 from app.services.object_cropper import ObjectCrop
 from app.services.text_asset_service import (
@@ -70,9 +72,13 @@ def fake_mesh():
             mesh=fake,
             synthesis=MockWorldSynthesisService(),
             text_assets=MockTextAssetService(),
+            filler_assets=MockFillerAssetService(),
+            library=MockLibraryAssetService(),
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
             max_text_assets_per_world=2,
+            max_filler_assets_per_world=2,
+            max_assets_per_world=12,
         )
     )
     return fake
@@ -147,9 +153,13 @@ def test_generate_world_includes_text_extracted_assets_with_handles(fake_mesh):
             mesh=fake_mesh,
             synthesis=MockWorldSynthesisService(),
             text_assets=text_assets,
+            filler_assets=MockFillerAssetService(),
+            library=MockLibraryAssetService(),
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
             max_text_assets_per_world=2,
+            max_filler_assets_per_world=2,
+            max_assets_per_world=12,
         )
     )
     client = TestClient(app)
@@ -175,9 +185,13 @@ def test_text_extraction_failure_does_not_fail_world(fake_mesh):
             mesh=fake_mesh,
             synthesis=MockWorldSynthesisService(),
             text_assets=FakeTextAssetService(RuntimeError("claude down")),
+            filler_assets=MockFillerAssetService(),
+            library=MockLibraryAssetService(),
             registry=MeshTaskRegistry(),
             max_objects_per_world=4,
             max_text_assets_per_world=2,
+            max_filler_assets_per_world=2,
+            max_assets_per_world=12,
         )
     )
     client = TestClient(app)

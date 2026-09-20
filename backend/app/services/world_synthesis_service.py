@@ -19,6 +19,7 @@ from app.models.world_recipe import (
     WorldRecipe,
     derive_seed,
 )
+from app.services.filler_asset_service import FillerAsset
 from app.services.mesh_generation_service import MeshTask
 from app.services.text_asset_service import ExtractedAsset
 from app.services.vision_service import SceneUnderstanding
@@ -27,8 +28,10 @@ logger = logging.getLogger(__name__)
 
 # Mirrors WorldRecipe.objects' max_length -- keep in sync by hand, same as
 # every other schema constant duplicated between app.models.world_recipe and
-# schemas/world_recipe.schema.json.
-_MAX_RECIPE_OBJECTS = 12
+# schemas/world_recipe.schema.json. This is a hard ceiling: MAX_ASSETS_PER_WORLD
+# (see providers.py) is configurable, but synthesize() clamps it to this, since
+# anything higher would make WorldRecipe fail its own schema validation.
+_SCHEMA_MAX_RECIPE_OBJECTS = 12
 
 # Keep in sync with the "at most MAX_LANDMARKS objects may be 'landmark'"
 # rule in both app.prompts.object_extraction and
@@ -47,7 +50,10 @@ class WorldSynthesisService(ABC):
         mesh_tasks: list[MeshTask] | None = None,
         text_assets: list[ExtractedAsset] | None = None,
         text_mesh_tasks: list[MeshTask] | None = None,
+        filler_assets: list[FillerAsset] | None = None,
+        filler_mesh_tasks: list[MeshTask] | None = None,
         sky: str = "sunny",
+        max_assets: int = _SCHEMA_MAX_RECIPE_OBJECTS,
     ) -> WorldRecipe:
         """`mesh_tasks` are the in-flight mesh generations for this world, one
         per detected object type that was successfully submitted; each becomes
@@ -55,7 +61,12 @@ class WorldSynthesisService(ABC):
         props extracted from the player's description alone (not necessarily
         in the photo); `text_mesh_tasks` are the in-flight generations for
         those, matched to `text_assets` by label the same way `mesh_tasks` is
-        matched to `scene.detected_objects`."""
+        matched to `scene.detected_objects`. `filler_assets` are generic
+        props suggested to diversify the world; `filler_mesh_tasks` are the
+        library lookups for those that were actually found -- a filler asset
+        with no match is dropped entirely rather than kept without one.
+        `max_assets` is the configured overall cap (providers.max_assets_per_world),
+        clamped to the schema's hard ceiling."""
         raise NotImplementedError
 
 
@@ -216,6 +227,44 @@ def _objects_from_text_assets(
     return entries
 
 
+def _objects_from_filler_assets(
+    filler_assets: list[FillerAsset],
+    filler_mesh_tasks: list[MeshTask],
+    taken_labels: set[str],
+) -> list[WorldObjectEntry]:
+    """One entry per filler keyword that was actually found in the library.
+
+    Unlike photo/text objects, a filler asset that found no match is dropped
+    entirely rather than kept with no asset: the whole point of filler is a
+    real library mesh, so a bare placeholder with a random generic keyword
+    adds nothing a photo/text object placeholder wouldn't already. Skips any
+    label already claimed by a photo- or text-derived object, same collision
+    rule as text vs. photo. Placement is never "landmark" here -- filler_assets
+    is restricted to that vocabulary upstream (FillerPlacement), so nothing to
+    demote/count against MAX_LANDMARKS.
+    """
+    task_by_label = {task.object_type: task for task in filler_mesh_tasks}
+    entries: list[WorldObjectEntry] = []
+    seen = set(taken_labels)
+    for asset in filler_assets:
+        if asset.keyword in seen:
+            logger.info("filler asset %r collides with an existing object; skipping", asset.keyword)
+            continue
+        task = task_by_label.get(asset.keyword)
+        if task is None:
+            continue  # no library match for this keyword -- nothing to add
+        seen.add(asset.keyword)
+        entries.append(
+            WorldObjectEntry(
+                type=asset.keyword,
+                density=asset.density,
+                placement=asset.placement,
+                asset=ObjectAsset(task_id=task.task_id, provider=task.provider),
+            )
+        )
+    return entries
+
+
 class MockWorldSynthesisService(WorldSynthesisService):
     """Deterministic mock: same (scene, description) always yields the same
     WorldRecipe (mesh task IDs aside). No external AI call is made."""
@@ -227,8 +276,12 @@ class MockWorldSynthesisService(WorldSynthesisService):
         mesh_tasks: list[MeshTask] | None = None,
         text_assets: list[ExtractedAsset] | None = None,
         text_mesh_tasks: list[MeshTask] | None = None,
+        filler_assets: list[FillerAsset] | None = None,
+        filler_mesh_tasks: list[MeshTask] | None = None,
         sky: str = "sunny",
+        max_assets: int = _SCHEMA_MAX_RECIPE_OBJECTS,
     ) -> WorldRecipe:
+        max_assets = min(max_assets, _SCHEMA_MAX_RECIPE_OBJECTS)
         profile_key = _pick_profile_key(scene, description)
         profile = _THEME_PROFILES[profile_key]
         seed = derive_seed(description, profile_key, "".join(scene.dominant_colors))
@@ -240,12 +293,17 @@ class MockWorldSynthesisService(WorldSynthesisService):
             {o.type for o in photo_objects},
             landmark_count=sum(1 for o in photo_objects if o.placement == "landmark"),
         )
-        objects = photo_objects + text_objects
+        filler_objects = _objects_from_filler_assets(
+            filler_assets or [],
+            filler_mesh_tasks or [],
+            {o.type for o in photo_objects} | {o.type for o in text_objects},
+        )
+        objects = photo_objects + text_objects + filler_objects
         if not objects:
             objects = list(profile["objects"])
-        if len(objects) > _MAX_RECIPE_OBJECTS:
-            logger.warning("world has %d objects, truncating to %d", len(objects), _MAX_RECIPE_OBJECTS)
-            objects = objects[:_MAX_RECIPE_OBJECTS]
+        if len(objects) > max_assets:
+            logger.warning("world has %d objects, truncating to %d", len(objects), max_assets)
+            objects = objects[:max_assets]
 
         return WorldRecipe(
             version=1,
