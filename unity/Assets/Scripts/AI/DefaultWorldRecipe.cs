@@ -10,9 +10,9 @@ namespace MarioKart.AI
     /// </summary>
     public static class DefaultWorldRecipe
     {
-        public static WorldRecipe Get()
+        public static WorldRecipe Get(string sky = "sunny")
         {
-            return new WorldRecipe
+            var recipe = new WorldRecipe
             {
                 version = 1,
                 seed = 1,
@@ -35,6 +35,8 @@ namespace MarioKart.AI
                 },
                 palette = new List<string> { "#F4E6C0", "#6B8F4A", "#A8C8DC" },
             };
+            recipe.world.sky = sky;
+            return recipe;
         }
     }
 }

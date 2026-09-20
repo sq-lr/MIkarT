@@ -334,11 +334,12 @@ namespace MarioKart.World
                     sunIntensity = 0.35f;
                     break;
                 default:
-                    foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
-                    {
-                        camera.clearFlags = CameraClearFlags.Skybox;
-                    }
-                    return;
+                    skyTop = new Color(0.18f, 0.47f, 0.62f);
+                    skyHorizon = new Color(0.70f, 0.86f, 0.78f);
+                    ambient = new Color(0.48f, 0.62f, 0.58f);
+                    sunColor = new Color(0.82f, 0.88f, 0.84f);
+                    sunIntensity = 0.7f;
+                    break;
             }
 
             RenderSettings.ambientLight = ambient;

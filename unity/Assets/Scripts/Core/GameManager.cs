@@ -29,6 +29,7 @@ namespace MarioKart.Core
         [SerializeField] private WorldGenerator worldGenerator;
         [SerializeField] private RaceManager raceManager;
         [SerializeField] private ResultsUI resultsUI;
+        private string requestedSky = "sunny";
 
         public GameConfig Config => config;
         public GameState CurrentState { get; private set; } = GameState.Boot;
@@ -109,6 +110,7 @@ namespace MarioKart.Core
         /// </summary>
         public void SubmitWorldInput(WorldGenerationRequest request)
         {
+            requestedSky = string.IsNullOrEmpty(request.sky) ? "sunny" : request.sky;
             TransitionTo(GameState.Generating);
             SetGenerationStatus("Generating your world...");
             recipeClient.RequestWorldRecipe(request, OnRecipeReady, OnRecipeFailed);
@@ -131,7 +133,7 @@ namespace MarioKart.Core
             Debug.LogWarning($"World generation failed, falling back to default world: {error}");
             if (config.fallbackToDefaultOnError)
             {
-                StartCoroutine(FallBackToDefaultWorld(error));
+                StartCoroutine(FallBackToDefaultWorld(error, requestedSky));
             }
             else
             {
@@ -142,11 +144,11 @@ namespace MarioKart.Core
         // Show *why* we're using the offline world for a few seconds before
         // building it. A silent fallback is indistinguishable from success
         // and sends people debugging the wrong thing.
-        private IEnumerator FallBackToDefaultWorld(string error)
+        private IEnumerator FallBackToDefaultWorld(string error, string sky)
         {
             SetGenerationStatus($"Couldn't generate from the backend:\n{error}\n\nUsing the offline world instead.");
             yield return new WaitForSecondsRealtime(3f);
-            BuildWorldAndAdvance(DefaultWorldRecipe.Get());
+            BuildWorldAndAdvance(DefaultWorldRecipe.Get(sky));
         }
 
         private void BuildWorldAndAdvance(WorldRecipe recipe)
