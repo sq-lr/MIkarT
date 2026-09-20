@@ -30,6 +30,7 @@ namespace MarioKart.AssetsSystem
             ["rock"] = new AssetDefinition { objectType = "rock", fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.62f, 0.58f, 0.48f), defaultScale = new Vector3(1f, 0.7f, 1f) },
             ["cactus"] = new AssetDefinition { objectType = "cactus", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.42f, 0.58f, 0.36f), defaultScale = new Vector3(0.4f, 1.5f, 0.4f) },
             ["bush"] = new AssetDefinition { objectType = "bush", fallbackPrimitive = PrimitiveType.Sphere, tintColor = new Color(0.46f, 0.62f, 0.36f), defaultScale = new Vector3(1.1f, 0.85f, 1.1f) },
+            ["fountain"] = new AssetDefinition { objectType = "fountain", fallbackPrimitive = PrimitiveType.Cylinder, tintColor = new Color(0.52f, 0.80f, 0.86f), defaultScale = new Vector3(1.2f, 1.6f, 1.2f) },
         };
 
         public AssetDefinition Resolve(WorldObjectEntry entry)

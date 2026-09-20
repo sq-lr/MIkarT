@@ -20,6 +20,8 @@ namespace MarioKart.World
     ///       roadside   -- lines the road at intervals, both sides, facing it.
     ///       background -- horizon layer only: huge, far, sky-tinted.
     ///       scattered  -- clusters (default when the hint is missing).
+    ///   • Water fountains line both shoulders of the course (outside the
+    ///     barrier walls, never on the racing lane), independent of the recipe.
     ///   • Zones: the loop is split into arcs and each type is active in only
     ///     some of them, so different stretches of the lap feel different.
     ///   • Clusters: scattered filler goes down in tight groups around a few
@@ -70,6 +72,12 @@ namespace MarioKart.World
         [Tooltip("Spacing between roadside objects at density 0 and density 1.")]
         public Vector2 roadsideIntervalRange = new Vector2(40f, 12f);
 
+        [Header("Fountains")]
+        [Tooltip("Metres between fountains along each shoulder of the course.")]
+        public float fountainInterval = 6.5f;
+        [Tooltip("How far past the barrier wall the fountains sit (never on the lane).")]
+        public Vector2 fountainOffsetBand = new Vector2(2.0f, 4.2f);
+
         [Header("Variation")]
         public Vector2 fillerScaleRange = new Vector2(0.7f, 1.4f);
         public Vector2 landmarkScaleRange = new Vector2(2.4f, 3.2f);
@@ -79,6 +87,12 @@ namespace MarioKart.World
         public float hueJitter = 0.03f, saturationJitter = 0.10f, valueJitter = 0.15f;
 
         private const float WallThickness = 0.5f; // matches TrackMeshBuilder
+        private const float FountainStartSkip = 12f;
+        private const float FountainFootprint = 1.15f;
+
+        private Material fountainStone;
+        private Material fountainWater;
+        private Material fountainSpray;
 
         private enum Role { Filler, Roadside, Landmark, Horizon }
 
@@ -106,6 +120,8 @@ namespace MarioKart.World
             }
 
             var layout = new TrackLayout(track);
+            PlaceFountains(track, layout, seed);
+
             var definitions = new List<AssetDefinition>();
             var placeholdersByType = new Dictionary<string, List<GameObject>>();
 
@@ -158,6 +174,174 @@ namespace MarioKart.World
             {
                 meshLoader.Begin(definitions, placeholdersByType);
             }
+        }
+
+        /// <summary>
+        /// Dense row of water fountains on both shoulders of the smoothed
+        /// racing line, always outside the barrier walls so they never sit
+        /// in the lane. Placed before recipe props so trees fill around them.
+        /// </summary>
+        private void PlaceFountains(GeneratedTrack track, TrackLayout layout, int seed)
+        {
+            if (track?.controlPoints == null || track.controlPoints.Count < 2) return;
+
+            EnsureFountainMaterials();
+            var rng = new WorldRandom(WorldRandom.DeriveSeed(seed, "fountains"));
+            var lane = TrackMeshBuilder.SmoothLoop(track.controlPoints);
+            int n = lane.Count;
+            if (n < 2) return;
+
+            float loopLength = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                loopLength += Vector3.Distance(lane[i], lane[(i + 1) % n]);
+            }
+
+            float interval = Mathf.Max(3.5f, fountainInterval);
+            float distance = 0f;
+            float sinceLast = interval;
+
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 start = lane[i];
+                Vector3 segment = lane[(i + 1) % n] - start;
+                float segmentLength = segment.magnitude;
+                Vector3 direction = segment / Mathf.Max(segmentLength, 0.001f);
+                Vector3 across = Vector3.Cross(Vector3.up, direction);
+                if (across.sqrMagnitude < 0.0001f) across = Vector3.right;
+                across.Normalize();
+
+                float t = interval - sinceLast;
+                while (t < segmentLength)
+                {
+                    float along = distance + t;
+                    float fromStart = Mathf.Min(along, loopLength - along);
+                    if (fromStart >= FountainStartSkip)
+                    {
+                        Vector3 centre = start + direction * t;
+                        for (int side = -1; side <= 1; side += 2)
+                        {
+                            TrySpawnFountain(layout, rng, centre, across * side);
+                        }
+                    }
+                    t += interval;
+                }
+                sinceLast = segmentLength - (t - interval);
+                distance += segmentLength;
+            }
+        }
+
+        private void TrySpawnFountain(TrackLayout layout, WorldRandom rng, Vector3 centre, Vector3 outward)
+        {
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                float extra = rng.NextRange(fountainOffsetBand.x, fountainOffsetBand.y) + attempt * 1.1f;
+                Vector3 position = centre + outward * (layout.HalfWidth + WallThickness + extra);
+                position.y = 0f;
+                if (!layout.IsFree(position, FountainFootprint)) continue;
+
+                float scale = rng.NextRange(0.85f, 1.25f);
+                SpawnFountain(position, Quaternion.LookRotation(-outward, Vector3.up), scale);
+                layout.Occupy(position, FountainFootprint * scale);
+                return;
+            }
+        }
+
+        private void SpawnFountain(Vector3 position, Quaternion rotation, float scale)
+        {
+            var root = new GameObject("Fountain");
+            root.transform.SetParent(transform, worldPositionStays: false);
+            root.transform.SetPositionAndRotation(position, rotation);
+            root.transform.localScale = Vector3.one * scale;
+
+            AddPart(root.transform, PrimitiveType.Cylinder, new Vector3(0f, 0.16f, 0f), new Vector3(1.85f, 0.16f, 1.85f), fountainStone);
+            AddPart(root.transform, PrimitiveType.Cylinder, new Vector3(0f, 0.62f, 0f), new Vector3(0.38f, 0.46f, 0.38f), fountainStone);
+            AddPart(root.transform, PrimitiveType.Cylinder, new Vector3(0f, 1.18f, 0f), new Vector3(1.15f, 0.12f, 1.15f), fountainStone);
+            AddPart(root.transform, PrimitiveType.Sphere, new Vector3(0f, 1.32f, 0f), new Vector3(1.02f, 0.10f, 1.02f), fountainWater);
+            AddPart(root.transform, PrimitiveType.Cylinder, new Vector3(0f, 1.85f, 0f), new Vector3(0.14f, 0.52f, 0.14f), fountainWater);
+            AddPart(root.transform, PrimitiveType.Sphere, new Vector3(0f, 2.42f, 0f), new Vector3(0.48f, 0.38f, 0.48f), fountainWater);
+            AddSpray(root.transform);
+        }
+
+        private static void AddPart(Transform parent, PrimitiveType type, Vector3 localPosition, Vector3 localScale, Material material)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.transform.SetParent(parent, worldPositionStays: false);
+            go.transform.localPosition = localPosition;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = localScale;
+            var col = go.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+            go.GetComponent<Renderer>().sharedMaterial = material;
+        }
+
+        private void AddSpray(Transform parent)
+        {
+            var go = new GameObject("Spray");
+            go.transform.SetParent(parent, worldPositionStays: false);
+            go.transform.localPosition = new Vector3(0f, 2.05f, 0f);
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.duration = 1f;
+            main.startLifetime = 0.65f;
+            main.startSpeed = 2.4f;
+            main.startSize = 0.11f;
+            main.startColor = new Color(0.78f, 0.92f, 0.96f, 0.7f);
+            main.gravityModifier = 1.15f;
+            main.maxParticles = 18;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+
+            var emission = ps.emission;
+            emission.rateOverTime = 14f;
+
+            var shape = ps.shape;
+            shape.enabled = true;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 12f;
+            shape.radius = 0.04f;
+
+            var colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var gradient = new Gradient();
+            gradient.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.7f, 0.88f, 0.92f), 1f) },
+                new[] { new GradientAlphaKey(0.75f, 0f), new GradientAlphaKey(0.35f, 0.45f), new GradientAlphaKey(0f, 1f) });
+            colorOverLifetime.color = gradient;
+
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sharedMaterial = fountainSpray;
+        }
+
+        private void EnsureFountainMaterials()
+        {
+            if (fountainStone == null)
+            {
+                fountainStone = GhibliLook.Lit(new Color(0.78f, 0.74f, 0.64f));
+                fountainStone.name = "FountainStone";
+            }
+            if (fountainWater == null)
+            {
+                fountainWater = GhibliLook.Lit(new Color(0.52f, 0.80f, 0.86f));
+                fountainWater.name = "FountainWater";
+                if (fountainWater.HasProperty("_Fill")) fountainWater.SetFloat("_Fill", 0.34f);
+            }
+            if (fountainSpray == null)
+            {
+                var shader = Shader.Find("Legacy Shaders/Particles/Alpha Blended") ?? Shader.Find("Sprites/Default");
+                fountainSpray = new Material(shader) { name = "FountainSpray", color = new Color(0.85f, 0.95f, 1f, 0.65f) };
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (fountainStone != null) Destroy(fountainStone);
+            if (fountainWater != null) Destroy(fountainWater);
+            if (fountainSpray != null) Destroy(fountainSpray);
         }
 
         // ------------------------------------------------------------------
