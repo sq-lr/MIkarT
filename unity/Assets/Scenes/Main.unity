@@ -3107,7 +3107,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   config:
     backendBaseUrl: http://localhost:8000
-    requestTimeoutSeconds: 15
+    requestTimeoutSeconds: 60
     defaultLapCount: 3
     countdownSeconds: 3
     fallbackToDefaultOnError: 1

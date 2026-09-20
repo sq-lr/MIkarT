@@ -1,0 +1,110 @@
+[
+  {
+    "keyword": "park_bench",
+    "found": true,
+    "task_id": "dfDUkVthkMT",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 12140,
+    "file": "meshes-retrieved/park_bench.glb"
+  },
+  {
+    "keyword": "street_lamp",
+    "found": true,
+    "task_id": "vPFSLYh6sg",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 29148,
+    "file": "meshes-retrieved/street_lamp.glb"
+  },
+  {
+    "keyword": "trash_can",
+    "found": true,
+    "task_id": "PEtRDeGyg0",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 11816,
+    "file": "meshes-retrieved/trash_can.glb"
+  },
+  {
+    "keyword": "bicycle_rack",
+    "found": true,
+    "task_id": "19VoUuA2pcN",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 2394132,
+    "file": "meshes-retrieved/bicycle_rack.glb"
+  },
+  {
+    "keyword": "bollard",
+    "found": true,
+    "task_id": "JSQJ07PFj2",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 369932,
+    "file": "meshes-retrieved/bollard.glb"
+  },
+  {
+    "keyword": "tree",
+    "found": true,
+    "task_id": "6Yjt8nIwLsD",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 70188,
+    "file": "meshes-retrieved/tree.glb"
+  },
+  {
+    "keyword": "bush",
+    "found": true,
+    "task_id": "d6STyhH76Qe",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 29880,
+    "file": "meshes-retrieved/bush.glb"
+  },
+  {
+    "keyword": "hedge",
+    "found": true,
+    "task_id": "df8uCl1YpK",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 160192,
+    "file": "meshes-retrieved/hedge.glb"
+  },
+  {
+    "keyword": "planter",
+    "found": true,
+    "task_id": "wn85Xr9lM3",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 53232,
+    "file": "meshes-retrieved/planter.glb"
+  },
+  {
+    "keyword": "office_building",
+    "found": true,
+    "task_id": "ppwtREejXg",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 143788,
+    "file": "meshes-retrieved/office_building.glb"
+  },
+  {
+    "keyword": "brick_building",
+    "found": true,
+    "task_id": "ppwtREejXg",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 143788,
+    "file": "meshes-retrieved/brick_building.glb"
+  },
+  {
+    "keyword": "picnic_table",
+    "found": true,
+    "task_id": "rAEBvfb1FT",
+    "provider": "polypizza",
+    "status": "ready",
+    "bytes": 46168,
+    "file": "meshes-retrieved/picnic_table.glb"
+  }
+]
